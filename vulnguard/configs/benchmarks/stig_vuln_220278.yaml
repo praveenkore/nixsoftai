@@ -1,0 +1,40 @@
+# STIG Benchmark Rule
+# DISA STIG for Red Hat Enterprise Linux 8
+# V-220278: The SSH daemon must not allow authentication using an empty password.
+
+benchmark: STIG
+id: "V-220278"
+title: "The SSH daemon must not allow authentication using an empty password."
+rationale: "Configuring the SSH daemon to prohibit password authentication with empty passwords reduces the probability of successful unauthorized access to the system."
+severity: high
+original_severity: CAT_II
+os_compatibility:
+  - rhel
+  - centos
+  - ubuntu
+  - debian
+
+check:
+  type: file
+  path: /etc/ssh/sshd_config
+  expected_content: "PermitEmptyPasswords no"
+  expected_permissions: "600"
+  expected_owner: "root"
+
+remediation:
+  commands:
+    - "sed -i 's/^#*PermitEmptyPasswords.*/PermitEmptyPasswords no/g' /etc/ssh/sshd_config"
+    - "chmod 600 /etc/ssh/sshd_config"
+    - "chown root:root /etc/ssh/sshd_config"
+    - "systemctl restart sshd"
+  requires_restart: true
+  requires_reboot: false
+
+rollback:
+  commands:
+    - "cp /var/lib/vulnguard/backups/sshd_config /etc/ssh/sshd_config"
+    - "systemctl restart sshd"
+
+ai_assist: false
+approval_required: true
+exception_allowed: false

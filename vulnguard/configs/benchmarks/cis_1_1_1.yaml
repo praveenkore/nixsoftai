@@ -1,0 +1,32 @@
+# CIS Benchmark Rule
+# CIS Ubuntu Linux 20.04 LTS Benchmark v2.0.0
+# Rule 1.1.1: Ensure mounting of cramfs filesystems is disabled
+
+benchmark: CIS
+id: "1.1.1"
+title: "Ensure mounting of cramfs filesystems is disabled"
+rationale: "The cramfs filesystem type is a compressed read-only Linux filesystem. Removing support for uncommon filesystems reduces the local attack surface of the system."
+severity: medium
+original_severity: Level2
+os_compatibility:
+  - ubuntu
+  - debian
+
+check:
+  type: command
+  command: "modprobe -n -v cramfs"
+  expected_state: "not found"
+
+remediation:
+  commands:
+    - "echo 'install cramfs /bin/true' >> /etc/modprobe.d/cramfs.conf"
+  requires_restart: false
+  requires_reboot: false
+
+rollback:
+  commands:
+    - "sed -i '/^install cramfs/d' /etc/modprobe.d/cramfs.conf"
+
+ai_assist: false
+approval_required: false
+exception_allowed: true

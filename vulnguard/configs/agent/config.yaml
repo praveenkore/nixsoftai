@@ -1,0 +1,127 @@
+# VulnGuard Agent Configuration
+# Global settings for the Linux Security Compliance Agent
+
+agent:
+  name: "VulnGuard"
+  version: "1.0.0"
+  mode: "dry-run"  # Options: dry-run, commit
+  
+# Logging configuration
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "json"  # Options: json, text
+  file_path: "/var/log/vulnguard/audit.log"
+  max_size_mb: 100
+  backup_count: 10
+  
+# Benchmark configuration
+benchmarks:
+  directory: "configs/benchmarks"
+  supported_types:
+    - "CIS"
+    - "STIG"
+  default_benchmark: "CIS"
+  
+# Severity normalization mapping
+severity_mapping:
+  CIS:
+    Level1: "high"
+    Level2: "medium"
+    Level3: "low"
+  STIG:
+    CAT_I: "critical"
+    CAT_II: "high"
+    CAT_III: "medium"
+    
+# Remediation safety controls
+remediation:
+  default_mode: "dry-run"
+  auto_backup: true
+  backup_directory: "/var/lib/vulnguard/backups"
+  rollback_on_failure: true
+  max_retries: 3
+  
+# Command allow-list (regex patterns)
+command_allowlist:
+  - "^systemctl\\s+(enable|disable|start|stop|restart|status)\\s+[a-zA-Z0-9_-]+$"
+  - "^sysctl\\s+-w\\s+[a-zA-Z0-9._-]+=.+$"
+  - "^chmod\\s+[0-7]{3,4}\\s+[a-zA-Z0-9_./-]+$"
+  - "^chown\\s+[a-zA-Z0-9_:.-]+\\s+[a-zA-Z0-9_./-]+$"
+  - "^sed\\s+-i\\s+.+\\s+[a-zA-Z0-9_./-]+$"
+  - "^echo\\s+.+\\s*>>?\\s*[a-zA-Z0-9_./-]+$"
+  
+# Command block-list (regex patterns)
+command_blocklist:
+  - "rm\\s+-rf"
+  - "chmod\\s+777"
+  - "userdel"
+  - "groupdel"
+  - "passwd\\s+-l\\s+root"
+  - "setenforce\\s+0"
+  
+# AI Advisor configuration
+ai:
+  enabled: true
+  provider: "openai"  # Options: openai, anthropic, openrouter, local, ollama, mock
+  min_confidence_threshold: 0.7
+  require_approval_for:
+    - "CAT_I"
+    - "CAT_II"
+    - "critical"
+  max_retries: 2
+  timeout_seconds: 30
+  
+  # OpenAI Configuration (when provider: openai)
+  openai:
+    api_key: "${OPENAI_API_KEY}"  # Set via environment variable
+    model: "gpt-4-turbo-preview"
+    api_endpoint: "https://api.openai.com/v1/chat/completions"
+    max_tokens: 2000
+    temperature: 0.3
+  
+  # Anthropic Configuration (when provider: anthropic)
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"  # Set via environment variable
+    model: "claude-3-opus-20240229"
+    api_endpoint: "https://api.anthropic.com/v1/messages"
+    max_tokens: 2000
+    temperature: 0.3
+  
+  # Local LLM Configuration (when provider: local)
+  local:
+    model_path: "/path/to/model"  # Path to local model file
+    model_type: "llama"  # Options: llama, mistral, falcon, etc.
+    device: "cuda"  # Options: cuda, cpu, auto
+    max_tokens: 2000
+    temperature: 0.3
+  
+  # Mock Configuration (when provider: mock)
+  mock:
+    enabled: false  # Use mock responses for testing
+  
+# Approval gating
+approval:
+  required_for_stig: true
+  required_for_critical: true
+  required_for_high: false
+  approval_method: "manual"  # Options: manual, auto
+  
+# OS compatibility
+os:
+  supported:
+    - "rhel"
+    - "ubuntu"
+    - "centos"
+    - "debian"
+  min_versions:
+    rhel: "8"
+    ubuntu: "20.04"
+    centos: "8"
+    debian: "10"
+    
+# Output configuration
+output:
+  format: "json"  # Options: json, yaml, text
+  include_timestamp: true
+  include_system_info: true
+  include_remediation_commands: true
