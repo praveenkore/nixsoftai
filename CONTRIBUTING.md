@@ -550,3 +550,18 @@ Thank you for contributing to VulnGuard and helping make open-source security to
 By contributing to VulnGuard, you agree that your contributions are licensed under the GNU General Public License v3 (GPL-3.0).
 
 See the [LICENSE](LICENSE) file for complete terms.
+
+Contributors will be acknowledged in:
+- CONTRIBUTORS file
+- Release notes
+- Project documentation
+
+Thank you for contributing to VulnGuard and helping make open-source security tools better for everyone!
+
+---
+
+## License
+
+By contributing to VulnGuard, you agree that your contributions are licensed under the GNU General Public License v3 (GPL-3.0).
+
+See the [LICENSE](LICENSE) file for complete terms.

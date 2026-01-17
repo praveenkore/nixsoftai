@@ -25,7 +25,7 @@ VulnGuard is an open-source Linux security compliance agent designed to help org
 If you discover a security vulnerability in VulnGuard, please report it responsibly before disclosing it publicly.
 
 **Primary Contact Method**:
-- Email: security@nixsoft.com
+- Email: info@nixsoftech.in
 - PGP Key: [Available on request]
 - Subject Line: `SECURITY: VulnGuard Vulnerability Report`
 
@@ -172,11 +172,11 @@ VulnGuard depends on the following third-party packages for security:
 ### Security Incident Categories
 
 1. **Vulnerability in VulnGuard Code**
-   - Report via: security@nixsoft.com
+   - Report via: info@nixsoftech.in
    - Follow: Vulnerability Reporting Process
 
 2. **Vulnerability in AI/LLM Integration**
-   - Report via: security@nixsoft.com
+   - Report via: info@nixsoftech.in
    - Include: Prompt used, model version, unexpected behavior
 
 3. **Security Misconfiguration**
