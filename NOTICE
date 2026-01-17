@@ -1,0 +1,44 @@
+NOTICE
+================================================================
+
+VulnGuard
+Copyright (c) Nixsoft Technologies Pvt. Ltd.
+
+This product includes software developed by Nixsoft Technologies Pvt. Ltd.
+
+VulnGuard is an AI-powered vulnerability scanning, assessment, and remediation
+agent designed to help organizations identify and address security vulnerabilities
+in their cloud infrastructure and applications.
+
+ATTRIBUTION
+================================================================
+
+Nixsoft Technologies Pvt. Ltd. is credited as the original author of VulnGuard.
+The project name "VulnGuard" must not be removed or rebranded without explicit
+written permission from Nixsoft Technologies Pvt. Ltd.
+
+THIRD-PARTY LICENSES
+================================================================
+
+This software may include third-party components under their respective licenses.
+Please refer to the individual component documentation and license files for
+detailed information.
+
+CONTACT
+================================================================
+
+For inquiries about VulnGuard or licensing matters, please contact:
+
+Nixsoft Technologies Pvt. Ltd.
+Email: [contact@nixsoft.com]
+Website: [https://www.nixsoft.com]
+
+DISCLAIMER
+================================================================
+
+This software is provided "AS IS" without warranty of any kind, express or implied.
+Nixsoft Technologies Pvt. Ltd. is not liable for any damages, outages, or data loss
+resulting from the use of this software.
+
+Users are responsible for validating compliance results and reviewing AI-assisted
+remediation recommendations before production use.

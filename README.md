@@ -1,5 +1,7 @@
 # VulnGuard - Linux Security Compliance Agent
 
+Copyright (c) Nixsoft Technologies Pvt. Ltd.
+
 A production-grade Linux Security Compliance Agent that audits, evaluates, and remediates systems against CIS Benchmarks and DISA STIG standards.
 
 ## Version
@@ -37,8 +39,8 @@ VulnGuard is designed for high-trust, regulated environments with strict safety 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-org/VulnGuard-agent-v1.git
-cd VulnGuard-agent-v1
+git clone https://github.com/praveenkore/nixsoftai.git
+cd nixsoftai
 ```
 
 2. Install dependencies:
@@ -306,8 +308,58 @@ For issues, questions, or contributions, please visit the project repository.
 
 ## License
 
-[Specify your license here]
+This project is released under the **GNU General Public License v3 (GPL-3.0)**.
 
-## Disclaimer
+For the full license text, see the [LICENSE](LICENSE) file in this repository.
+
+### License Summary
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+## Nixsoft Open Source Usage Guidelines
+
+### Attribution
+
+- Nixsoft Technologies Pvt. Ltd. must be credited as the original author.
+- The project name "VulnGuard" must not be removed or rebranded without explicit permission.
+- See the [NOTICE](NOTICE) file for detailed attribution information.
+
+### Commercial Usage
+
+- The software may be used commercially ONLY under GPL v3 terms.
+- Any derivative work MUST also be released under GPL v3.
+- SaaS or managed service offerings MUST disclose source code as required by GPL v3.
+
+### Warranty Disclaimer
+
+- The software is provided "AS IS"
+- No warranty of any kind, express or implied
+- Nixsoft is not liable for damages, outages, or data loss
+
+### Security Responsibility
+
+- Users are responsible for validating compliance results.
+- AI-assisted remediation must be reviewed before production use.
+
+### Contributions
+
+- Contributions must preserve license headers.
+- Contributors agree that submissions are licensed under GPL v3.
+- No proprietary code may be submitted.
+
+## Commercial & Compliance Disclaimer
 
 VulnGuard is provided as-is for security compliance purposes. Always test in a non-production environment before deploying to production systems. Review all remediation commands carefully before executing in commit mode.
+
+**IMPORTANT**: This software is designed to assist with security compliance but does not guarantee compliance with any specific standard. Users are responsible for:
+- Validating all compliance results
+- Reviewing and approving all remediation actions
+- Ensuring compliance with applicable laws and regulations
+- Maintaining proper backups before making changes
+- Understanding the impact of all remediation actions
+
+Nixsoft Technologies Pvt. Ltd. accepts no liability for any security incidents, compliance failures, or damages resulting from the use of this software.
