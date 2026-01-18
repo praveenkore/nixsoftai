@@ -1,0 +1,29 @@
+benchmark: STIG
+id: "V-230272"
+title: "The operating system must configure automatic security updates."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "Automatic security updates ensure that security patches are applied in a timely manner."
+check:
+  type: file
+  command: "test -f /etc/apt/apt.conf.d/20auto-upgrades && grep -q 'APT::Periodic::Unattended-Upgrade \"1\"' /etc/apt/apt.conf.d/20auto-upgrades"
+  expected_state: "0"
+remediation:
+  commands:
+    - "cat > /etc/apt/apt.conf.d/50unattended-upgrades << 'EOF'\nUnattended-Upgrade::Allowed-Origins {\n        \"${distro_id}:${distro_codename}\";\n        \"${distro_id}:${distro_codename}-security\";\n        \"${distro_id}ESMApps:${distro_codename}-apps-security\";\n        \"${distro_id}ESM:${distro_codename}-infra-security\";\n};\nUnattended-Upgrade::AutoFixInterruptedDpkg \"true\";\nUnattended-Upgrade::Remove-Unused-Kernel-Packages \"true\";\nUnattended-Upgrade::Remove-Unused-Dependencies \"true\";\nUnattended-Upgrade::Automatic-Reboot \"false\";\nUnattended-Upgrade::Mail \"root\";\nUnattended-Upgrade::MailOnlyOnError \"true\";\nEOF"
+    - "cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'\nAPT::Periodic::Update-Package-Lists \"1\";\nAPT::Periodic::Unattended-Upgrade \"1\";\nAPT::Periodic::Download-Upgradeable-Packages \"1\";\nAPT::Periodic::AutocleanInterval \"7\";\nEOF"
+    - "systemctl restart unattended-upgrades"
+    - "systemctl enable unattended-upgrades"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "rm -f /etc/apt/apt.conf.d/50unattended-upgrades"
+    - "rm -f /etc/apt/apt.conf.d/20auto-upgrades"
+    - "systemctl stop unattended-upgrades"
+    - "systemctl disable unattended-upgrades"
+ai_assist: false
+approval_required: true
+exception_allowed: true

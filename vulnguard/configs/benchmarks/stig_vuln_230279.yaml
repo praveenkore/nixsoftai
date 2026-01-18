@@ -1,0 +1,27 @@
+benchmark: STIG
+id: "V-230279"
+title: "The SSH daemon must ignore .rhosts files."
+severity: medium
+original_severity: "CAT III"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "Ignoring .rhosts files prevents authentication based on potentially insecure host-based trust relationships."
+check:
+  type: file
+  command: "grep -E '^IgnoreRhosts' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | grep -v '^#' | awk '{print $2}' | grep -q 'yes'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "mkdir -p /etc/ssh/sshd_config.d/"
+    - "cat > /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'\n# SSH Hardening Configuration\nIgnoreRhosts yes\nEOF"
+    - "sshd -t || exit 1"
+    - "systemctl restart sshd"
+  requires_restart: true
+  requires_reboot: false
+rollback:
+  commands:
+    - "rm -f /etc/ssh/sshd_config.d/99-hardening.conf"
+    - "systemctl restart sshd"
+ai_assist: false
+approval_required: true
+exception_allowed: true

@@ -1,0 +1,27 @@
+benchmark: STIG
+id: "V-230282"
+title: "The SSH daemon must not permit X11 forwarding."
+severity: medium
+original_severity: "CAT III"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "X11 forwarding can be exploited for unauthorized access to the X11 display server."
+check:
+  type: file
+  command: "grep -E '^X11Forwarding' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | grep -v '^#' | awk '{print $2}' | grep -q 'no'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "mkdir -p /etc/ssh/sshd_config.d/"
+    - "cat > /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'\n# SSH Hardening Configuration\nX11Forwarding no\nEOF"
+    - "sshd -t || exit 1"
+    - "systemctl restart sshd"
+  requires_restart: true
+  requires_reboot: false
+rollback:
+  commands:
+    - "rm -f /etc/ssh/sshd_config.d/99-hardening.conf"
+    - "systemctl restart sshd"
+ai_assist: false
+approval_required: true
+exception_allowed: true

@@ -1,0 +1,26 @@
+benchmark: STIG
+id: "V-230268"
+title: "The operating system must configure kernel parameters to prevent IP spoofing."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "Reverse path filtering prevents IP spoofing attacks by verifying that source addresses are reachable via the interface they arrived on."
+check:
+  type: sysctl
+  command: "sysctl net.ipv4.conf.all.rp_filter"
+  expected_state: "1"
+remediation:
+  commands:
+    - "cat > /etc/sysctl.d/99-security.conf << 'EOF'\n# IP Spoofing protection\nnet.ipv4.conf.all.rp_filter = 1\nnet.ipv4.conf.default.rp_filter = 1\nEOF"
+    - "sysctl -p /etc/sysctl.d/99-security.conf"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "rm -f /etc/sysctl.d/99-security.conf"
+    - "sysctl -w net.ipv4.conf.all.rp_filter=0"
+    - "sysctl -w net.ipv4.conf.default.rp_filter=0"
+ai_assist: false
+approval_required: true
+exception_allowed: true

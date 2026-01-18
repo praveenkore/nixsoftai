@@ -1,0 +1,23 @@
+benchmark: STIG
+id: "V-230269"
+title: "The operating system must use a file integrity tool to verify correct operation of security functions."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "AIDE is a file integrity tool that monitors changes to critical system files, directories, and configurations. Without file integrity monitoring, unauthorized changes to system files may go undetected."
+check:
+  type: command
+  command: "dpkg -l | grep -q '^ii  aide'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "DEBIAN_FRONTEND=noninteractive apt-get install -y aide aide-common"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "DEBIAN_FRONTEND=noninteractive apt-get remove -y aide aide-common"
+ai_assist: false
+approval_required: true
+exception_allowed: true

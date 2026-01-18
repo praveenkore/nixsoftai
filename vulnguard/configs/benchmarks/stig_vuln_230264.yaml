@@ -1,0 +1,25 @@
+benchmark: STIG
+id: "V-230264"
+title: "The operating system must configure kernel parameters to enable ASLR."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "Address Space Layout Randomization (ASLR) makes it harder for attackers to predict memory addresses."
+check:
+  type: sysctl
+  command: "sysctl kernel.randomize_va_space"
+  expected_state: "2"
+remediation:
+  commands:
+    - "cat >> /etc/sysctl.d/99-security.conf << 'EOF'\n# Enable Address Space Layout Randomization\nkernel.randomize_va_space = 2\nEOF"
+    - "sysctl -p /etc/sysctl.d/99-security.conf"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "sed -i '/kernel.randomize_va_space/d' /etc/sysctl.d/99-security.conf"
+    - "sysctl -w kernel.randomize_va_space=1"
+ai_assist: false
+approval_required: true
+exception_allowed: true

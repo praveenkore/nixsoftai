@@ -1,0 +1,27 @@
+benchmark: STIG
+id: "V-230277"
+title: "The SSH daemon must use protocol 2."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "SSH protocol 1 is deprecated and has known vulnerabilities. Protocol 2 provides stronger security features."
+check:
+  type: file
+  command: "grep -E '^Protocol' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | grep -v '^#' | awk '{print $2}' | grep -q '2'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "mkdir -p /etc/ssh/sshd_config.d/"
+    - "cat > /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'\n# SSH Hardening Configuration\nProtocol 2\nEOF"
+    - "sshd -t || exit 1"
+    - "systemctl restart sshd"
+  requires_restart: true
+  requires_reboot: false
+rollback:
+  commands:
+    - "rm -f /etc/ssh/sshd_config.d/99-hardening.conf"
+    - "systemctl restart sshd"
+ai_assist: false
+approval_required: true
+exception_allowed: true

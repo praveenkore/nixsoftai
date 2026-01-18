@@ -1,0 +1,26 @@
+benchmark: STIG
+id: "V-230270"
+title: "The operating system must use a Mandatory Access Control (MAC) system to enforce access restrictions."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "AppArmor provides mandatory access control by confining programs to a limited set of files, capabilities, and resources."
+check:
+  type: command
+  command: "dpkg -l | grep -q '^ii  apparmor' && aa-status | grep -q 'profiles are in enforce mode'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "systemctl enable apparmor"
+    - "systemctl start apparmor"
+    - "aa-enforce /etc/apparmor.d/*"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "systemctl disable apparmor"
+    - "systemctl stop apparmor"
+ai_assist: false
+approval_required: true
+exception_allowed: true

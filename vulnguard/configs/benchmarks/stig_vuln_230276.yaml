@@ -1,0 +1,27 @@
+benchmark: STIG
+id: "V-230276"
+title: "The SSH daemon must not permit password-based authentication."
+severity: critical
+original_severity: "CAT I"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "Password-based authentication is vulnerable to brute force attacks. Public key authentication is more secure."
+check:
+  type: file
+  command: "grep -E '^PasswordAuthentication' /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | grep -v '^#' | awk '{print $2}' | grep -q 'no'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "mkdir -p /etc/ssh/sshd_config.d/"
+    - "cat > /etc/ssh/sshd_config.d/99-hardening.conf << 'EOF'\n# SSH Hardening Configuration\nPasswordAuthentication no\nEOF"
+    - "sshd -t || exit 1"
+    - "systemctl restart sshd"
+  requires_restart: true
+  requires_reboot: false
+rollback:
+  commands:
+    - "rm -f /etc/ssh/sshd_config.d/99-hardening.conf"
+    - "systemctl restart sshd"
+ai_assist: false
+approval_required: true
+exception_allowed: true

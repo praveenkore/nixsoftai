@@ -220,7 +220,7 @@ Nixsoft Technologies Pvt. Ltd. accepts no liability for:
 
 ### Security Team
 
-- **Email**: security@nixsoft.com
+- **Email**: info@nixsoftech.in
 - **PGP Key**: Available on request
 - **Response Time**: Within 72 hours for initial acknowledgment
 

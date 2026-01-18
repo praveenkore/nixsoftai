@@ -1,0 +1,23 @@
+benchmark: STIG
+id: "V-230267"
+title: "The operating system must produce audit records containing information to establish the source of the events."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "Auditd must be installed and configured to collect security-relevant events for forensic analysis and compliance."
+check:
+  type: command
+  command: "dpkg -l | grep -q '^ii  auditd'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "DEBIAN_FRONTEND=noninteractive apt-get install -y auditd audispd-plugins"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "DEBIAN_FRONTEND=noninteractive apt-get remove -y auditd audispd-plugins"
+ai_assist: false
+approval_required: true
+exception_allowed: true

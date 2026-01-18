@@ -1,0 +1,29 @@
+benchmark: STIG
+id: "V-230274"
+title: "The operating system must have a host-based firewall installed and enabled."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "UFW (Uncomplicated Firewall) provides network-level protection by controlling inbound and outbound traffic."
+check:
+  type: command
+  command: "dpkg -l | grep -q '^ii  ufw' && ufw status | grep -q 'Status: active'"
+  expected_state: "0"
+remediation:
+  commands:
+    - "DEBIAN_FRONTEND=noninteractive apt-get install -y ufw"
+    - "ufw --force reset"
+    - "ufw default deny incoming"
+    - "ufw default allow outgoing"
+    - "ufw default deny routed"
+    - "ufw limit 22/tcp comment 'SSH rate limit'"
+    - "echo 'y' | ufw enable"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "ufw --force reset"
+ai_assist: false
+approval_required: true
+exception_allowed: true

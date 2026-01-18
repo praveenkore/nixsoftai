@@ -1,0 +1,27 @@
+benchmark: STIG
+id: "V-230266"
+title: "The operating system must configure kernel parameters to disable ICMP redirects."
+severity: medium
+original_severity: "CAT III"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "ICMP redirects can be exploited for man-in-the-middle attacks and should be disabled."
+check:
+  type: sysctl
+  command: "sysctl net.ipv4.conf.all.accept_redirects"
+  expected_state: "0"
+remediation:
+  commands:
+    - "cat >> /etc/sysctl.d/99-security.conf << 'EOF'\n# Ignore ICMP redirects\nnet.ipv4.conf.all.accept_redirects = 0\nnet.ipv6.conf.all.accept_redirects = 0\nEOF"
+    - "sysctl -p /etc/sysctl.d/99-security.conf"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "sed -i '/net.ipv4.conf.all.accept_redirects/d' /etc/sysctl.d/99-security.conf"
+    - "sed -i '/net.ipv6.conf.all.accept_redirects/d' /etc/sysctl.d/99-security.conf"
+    - "sysctl -w net.ipv4.conf.all.accept_redirects=1"
+    - "sysctl -w net.ipv6.conf.all.accept_redirects=1"
+ai_assist: false
+approval_required: true
+exception_allowed: true

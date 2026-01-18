@@ -1,0 +1,30 @@
+benchmark: STIG
+id: "V-230271"
+title: "The file integrity tool must be configured to verify correct operation of security functions."
+severity: high
+original_severity: "CAT II"
+os_compatibility:
+  - ubuntu: "18.04+"
+rationale: "AIDE must be configured with a database and scheduled checks to detect unauthorized changes to system files and directories."
+check:
+  type: file
+  command: "test -f /var/lib/aide/aide.db && systemctl is-active aide-check.timer"
+  expected_state: "0"
+remediation:
+  commands:
+    - "aideinit"
+    - "mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db"
+    - "chmod 600 /var/lib/aide/aide.db"
+    - "systemctl daemon-reload"
+    - "systemctl enable aide-check.timer"
+    - "systemctl start aide-check.timer"
+  requires_restart: false
+  requires_reboot: false
+rollback:
+  commands:
+    - "systemctl stop aide-check.timer"
+    - "systemctl disable aide-check.timer"
+    - "rm -f /var/lib/aide/aide.db"
+ai_assist: false
+approval_required: true
+exception_allowed: true
