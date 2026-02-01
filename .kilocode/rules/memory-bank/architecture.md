@@ -319,6 +319,24 @@ vulnguard/
 - **Manifests**: Explicitly declared capabilities (e.g., `FILE_READ: ["/var/log"]`).
 - **Signing**: Plugins must be digitally signed (verification enforced by Manager).
 
+### 7. Gateway Module (New)
+
+**Purpose:** Centralized reporting and management
+
+**Key Classes:**
+- [`GatewayClient`](../vulnguard/pkg/gateway/client.py) - HTTPS client for reporting
+- [`GatewayError`](../vulnguard/pkg/gateway/exceptions.py) - Gateway-specific exceptions
+
+**Responsibilities:**
+- Push compliance reports in JSON format to C2 server
+- Handle secure authentication (mTLS/API Key)
+- Provide retry and error handling for unreliable connections
+
+**Security Controls:**
+- **Encryption**: TLS 1.3 for all data in transit.
+- **Verification**: Mandatory SSL certificate validation.
+- **Authentication**: Pre-shared API keys or certificate-based auth.
+
 - `approval_request`: Approval requirement
 - `error`: Error events
 - `system_info`: System information at scan start

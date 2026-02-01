@@ -43,6 +43,8 @@ from vulnguard.pkg.exceptions import (
     ScanError,
     RemediationError
 )
+from vulnguard.pkg.gateway.client import GatewayClient
+
 
 
 # Configuration schema for validation
@@ -81,7 +83,9 @@ CONFIG_SCHEMA = {
                     "properties": {
                         "api_key": {"type": "string"},
                         "model": {"type": "string"},
-                        "api_endpoint": {"type": "string", "format": "uri"}
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                     }
                 },
                 "anthropic": {
@@ -89,7 +93,9 @@ CONFIG_SCHEMA = {
                     "properties": {
                         "api_key": {"type": "string"},
                         "model": {"type": "string"},
-                        "api_endpoint": {"type": "string", "format": "uri"}
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                     }
                 },
                 "openrouter": {
@@ -98,14 +104,18 @@ CONFIG_SCHEMA = {
                         "api_key": {"type": "string"},
                         "model": {"type": "string"},
                         "api_endpoint": {"type": "string", "format": "uri"},
-                        "site_url": {"type": "string", "format": "uri"}
+                        "site_url": {"type": "string", "format": "uri"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                     }
                 },
                 "ollama": {
                     "type": "object",
                     "properties": {
                         "api_endpoint": {"type": "string", "format": "uri"},
-                        "model": {"type": "string"}
+                        "model": {"type": "string"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                     }
                 },
                 "local": {
@@ -113,7 +123,80 @@ CONFIG_SCHEMA = {
                     "properties": {
                         "model_path": {"type": "string"},
                         "model_type": {"type": "string"},
-                        "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}
+                        "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                    }
+                }
+            }
+        },
+        "gateway": {
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "server_url": {"type": "string"},
+                "api_key": {"type": "string"},
+                "verify_ssl": {"type": "boolean"},
+                "reporting_interval": {"type": "number", "minimum": 0}
+            }
+        },
+        "approval": {
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "provider": {"type": "string", "enum": ["openai", "anthropic", "openrouter", "ollama", "local", "mock"]},
+                "min_confidence_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "max_retries": {"type": "number", "minimum": 0, "maximum": 10},
+                "rate_limit": {"type": "number", "minimum": 1},
+                "timeout_seconds": {"type": "number", "minimum": 1},
+                "openai": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "model": {"type": "string"},
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                    }
+                },
+                "anthropic": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "model": {"type": "string"},
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                    }
+                },
+                "openrouter": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "model": {"type": "string"},
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "site_url": {"type": "string", "format": "uri"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                    }
+                },
+                "ollama": {
+                    "type": "object",
+                    "properties": {
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "model": {"type": "string"},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                    }
+                },
+                "local": {
+                    "type": "object",
+                    "properties": {
+                        "model_path": {"type": "string"},
+                        "model_type": {"type": "string"},
+                        "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]},
+                        "max_tokens": {"type": "number", "minimum": 1},
+                        "temperature": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                     }
                 }
             }
@@ -185,6 +268,19 @@ class VulnGuardOrchestrator:
             backup_count=self.config.get('logging', {}).get('backup_count', 10)
         )
         
+        # Initialize gateway client if enabled
+        gateway_config = self.config.get('gateway', {})
+        self.gateway_enabled = gateway_config.get('enabled', False)
+        if self.gateway_enabled:
+            self.gateway_client = GatewayClient(
+                server_url=gateway_config.get('server_url'),
+                api_key=gateway_config.get('api_key'),
+                verify_ssl=gateway_config.get('verify_ssl', True),
+                logger=self.logger
+            )
+        else:
+            self.gateway_client = None
+
         self.scanner = Scanner(
             benchmark_dir=self.benchmark_dir,
             logger=self.logger
@@ -496,7 +592,13 @@ def cli():
     default='json',
     help='Output format (default: json).'
 )
-def scan(rule_id: tuple, output: Optional[str], format: str):
+@click.option(
+    '--send',
+    '-s',
+    is_flag=True,
+    help='Send the report to the centralized C2 server.'
+)
+def scan(rule_id: tuple, output: Optional[str], format: str, send: bool):
     """
     Scan system for compliance issues.
     
@@ -517,6 +619,23 @@ def scan(rule_id: tuple, output: Optional[str], format: str):
         output_format=format
     )
     
+    # Send to gateway if requested
+    if send:
+        if orchestrator.gateway_enabled and orchestrator.gateway_client:
+            # Generate JSON data for gateway
+            json_report = json.loads(orchestrator.generate_report(
+                scan_results=scan_results,
+                evaluation_results=evaluation_results,
+                output_format='json'
+            ))
+            try:
+                orchestrator.gateway_client.send_report(json_report)
+                click.echo("Report successfully sent to C2 server.")
+            except Exception as e:
+                click.echo(f"Error sending report to C2 server: {str(e)}", err=True)
+        else:
+            click.echo("Gateway is not enabled in configuration. Cannot send report.", err=True)
+
     # Output report
     if output:
         with open(output, 'w') as f:
@@ -558,7 +677,13 @@ def scan(rule_id: tuple, output: Optional[str], format: str):
     default='json',
     help='Output format (default: json).'
 )
-def remediate(rule_id: tuple, mode: str, force: bool, output: Optional[str], format: str):
+@click.option(
+    '--send',
+    '-s',
+    is_flag=True,
+    help='Send the remediation report to the centralized C2 server.'
+)
+def remediate(rule_id: tuple, mode: str, force: bool, output: Optional[str], format: str, send: bool):
     """
     Remediate non-compliant security issues.
     
@@ -589,6 +714,24 @@ def remediate(rule_id: tuple, mode: str, force: bool, output: Optional[str], for
         output_format=format
     )
     
+    # Send to gateway if requested
+    if send:
+        if orchestrator.gateway_enabled and orchestrator.gateway_client:
+            # Generate JSON data for gateway
+            json_report = json.loads(orchestrator.generate_report(
+                scan_results=scan_results,
+                evaluation_results=evaluation_results,
+                remediation_results=remediation_results,
+                output_format='json'
+            ))
+            try:
+                orchestrator.gateway_client.send_report(json_report)
+                click.echo("Remediation report successfully sent to C2 server.")
+            except Exception as e:
+                click.echo(f"Error sending report to C2 server: {str(e)}", err=True)
+        else:
+            click.echo("Gateway is not enabled in configuration. Cannot send report.", err=True)
+
     # Output report
     if output:
         with open(output, 'w') as f:

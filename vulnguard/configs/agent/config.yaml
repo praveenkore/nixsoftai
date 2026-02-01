@@ -125,3 +125,11 @@ output:
   include_timestamp: true
   include_system_info: true
   include_remediation_commands: true
+
+# Centralized Gateway Configuration
+gateway:
+  enabled: false
+  server_url: "https://c2.vulnguard.internal:8443"
+  api_key: "${VG_GATEWAY_API_KEY}"
+  verify_ssl: true
+  reporting_interval: 0 # 0 = manual/on-completion
