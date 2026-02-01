@@ -12,7 +12,8 @@ VulnGuard is an open-source Linux security compliance agent designed to help org
 
 | Version | Status | Support Until |
 |----------|---------|---------------|
-| v0.1.0 | Current | Until v0.2.0 release or 6 months from release date |
+| v1.1.0 | Current | Until v1.2.0 release or 6 months from release date |
+| v1.0.0 | EOL | Superseded by v1.1.0 |
 
 **Note**: Only the latest version receives security updates. Users are strongly encouraged to upgrade to the most recent version.
 
