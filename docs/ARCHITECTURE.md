@@ -13,6 +13,7 @@ This document provides a comprehensive overview of the VulnGuard Linux Security 
 - [Safety Controls](#safety-controls)
 - [Extensibility](#extensibility)
 - [Performance Considerations](#performance-considerations)
+- [Security Module](#security-module)
 
 ---
 
@@ -119,6 +120,14 @@ Prioritizes:
 │                    │  (Audit)     │                         │
 │                    └──────────────┘                         │
 │                                                               │
+│  ┌───────────────────────────────────────────────────────┐      │
+│  │              Security Module (Phase 1)               │      │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────┐ │      │
+│  │  │  Command     │ │  File        │ │ Atomic   │ │      │
+│  │  │  Executor   │ │ Permissions  │ │ Operations│ │      │
+│  │  └──────────────┘ └──────────────┘ └──────────┘ │      │
+│  └───────────────────────────────────────────────────────┘      │
+│                                                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -156,6 +165,16 @@ VulnGuard follows a layered architecture pattern:
 ┌─────────────────────────────────────────────────────────────┐
 │                   Infrastructure Layer                      │
 │                     (Audit Logger)                          │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Security Layer (Phase 1)                 │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ │
+│  │  Command     │ │  File        │ │ Atomic       │ │
+│  │  Executor   │ │ Permissions  │ │ Operations  │ │
+│  │ (No Shell)  │ │ (0600/0700) │ │ (TOCTOU)     │ │
+│  └──────────────┘ └──────────────┘ └──────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -318,7 +337,138 @@ VulnGuard follows a layered architecture pattern:
 - Both file and console output
 - Complete context in every log entry
 
-### 6. Main Orchestrator ([`vulnguard/main.py`](vulnguard/main.py))
+### 6. Security Module ([`vulnguard/pkg/security/`](vulnguard/pkg/security/))
+
+**Purpose**: Phase 1 critical security fixes providing secure foundations for all operations
+
+**Responsibilities**:
+- Eliminate command injection vulnerabilities through secure command execution
+- Enforce secure file and directory permissions
+- Prevent TOCTOU (Time-of-Check Time-of-Use) vulnerabilities with atomic operations
+- Provide audit logging for all security operations
+- Support lazy loading to avoid circular dependencies
+
+**Key Classes**:
+- [`SecureCommandExecutor`](vulnguard/pkg/security/command_executor.py:47): Secure command executor with no shell=True
+- [`SecureFilePermissions`](vulnguard/pkg/security/file_permissions.py:41): Secure file and directory permission manager
+- [`AtomicFileOperations`](vulnguard/pkg/security/atomic_operations.py:41): Atomic file operations to prevent TOCTOU
+
+**Security Features**:
+
+#### Command Execution Security ([`SecureCommandExecutor`](vulnguard/pkg/security/command_executor.py:47))
+- **Never uses shell=True** - All commands executed with `shell=False`
+- **Parameterized execution** - Commands passed as list of arguments
+- **Allow-list enforcement** - Only approved commands can execute
+- **Block-list enforcement** - Dangerous patterns explicitly blocked
+- **Input sanitization** - All inputs validated and sanitized
+- **Audit logging** - All command executions logged
+
+**Default Allow-List**:
+```python
+DEFAULT_COMMAND_ALLOWLIST = [
+    r'^systemctl$',
+    r'^sysctl$',
+    r'^chmod$',
+    r'^chown$',
+    r'^sed$',
+    r'^echo$',
+    r'^cat$',
+    r'^grep$',
+    r'^awk$',
+    r'^stat$',
+    r'^ls$',
+    r'^find$',
+    r'^test$',
+    r'\[',
+    r'^which$',
+    r'^id$',
+    r'^whoami$',
+    r'^hostname$',
+    r'^uname$',
+    r'^df$',
+    r'^du$',
+    r'^mount$',
+    r'^umount$',
+    r'^ps$',
+    r'^netstat$',
+    r'^ss$',
+    r'^ip$',
+    r'^getent$',
+    r'^pwd$'
+]
+```
+
+**Default Block-List**:
+```python
+COMMAND_BLOCKLIST = [
+    r'^rm\s+-rf\s*/',
+    r'^chmod\s+777',
+    r'^dd\s+',
+    r'^mkfs',
+    r'^fdisk',
+    r'^userdel',
+    r'^groupdel',
+    r'^passwd\s+-l\s+root',
+    r'^setenforce\s+0',
+    r'^iptables\s+-F',
+    r':(){:|:&};:',  # Shellshock
+    r'eval\s*\(',
+    r'exec\s*\(',
+    r'\$\(',
+    r'`[^`]*`',  # Backtick command substitution
+    r';\s*rm\s',
+    r'&&\s*rm\s',
+    r'\|\|\s*rm\s',
+    r'>\s*/dev/',
+    r'>>\s*/etc/',
+    r'nc\s+-l',  # Netcat listener
+    r'ncat\s+-l',
+    r'socat\s+TCP-LISTEN'
+]
+```
+
+#### File Permission Security ([`SecureFilePermissions`](vulnguard/pkg/security/file_permissions.py:41))
+- **Secure defaults** - Files: 0600, Directories: 0700
+- **Explicit permission setting** - All operations specify permissions
+- **Permission verification** - Verifies permissions after creation
+- **Audit capabilities** - Can audit directory permissions
+- **Cross-platform support** - Works consistently across platforms
+
+**Default Permissions**:
+```python
+DEFAULT_FILE_PERMISSIONS = 0o600  # rw------- (owner read/write only)
+DEFAULT_DIR_PERMISSIONS = 0o700   # rwx------ (owner read/write/execute only)
+MAX_FILE_PERMISSIONS = 0o644  # rw-r--r-- (owner read/write, group/others read)
+MAX_DIR_PERMISSIONS = 0o755   # rwxr-xr-x (owner full, group/others read/execute)
+TEMP_FILE_PERMISSIONS = 0o600
+TEMP_DIR_PERMISSIONS = 0o700
+```
+
+#### Atomic File Operations ([`AtomicFileOperations`](vulnguard/pkg/security/atomic_operations.py:41))
+- **Atomic operations** - Uses `os.replace()`, `open(..., mode='x')`
+- **Eliminates race conditions** - Check and use in single operation
+- **Safe file patterns** - Temporary file patterns for updates
+- **Backup support** - Optional backup before operations
+- **Error handling** - Proper cleanup on failures
+
+**Available Operations**:
+- `atomic_read()` - Atomically read a file
+- `atomic_write()` - Atomically write content to a file
+- `atomic_create()` - Atomically create a new file (fails if exists)
+- `atomic_append()` - Atomically append content to a file
+- `atomic_replace()` - Atomically replace a file with another
+- `atomic_copy()` - Atomically copy a file to a new location
+- `atomic_delete()` - Atomically delete a file
+- `atomic_file_exists()` - Check if file exists (non-atomic, but safe for most use cases)
+
+**Design Decisions**:
+- Lazy loading to avoid circular dependencies
+- All security operations are auditable
+- Defensive programming with comprehensive error handling
+- Follows enterprise security standards
+- Designed to pass security audits and penetration testing
+
+### 7. Main Orchestrator ([`vulnguard/main.py`](vulnguard/main.py))
 
 **Purpose**: Main orchestrator for VulnGuard operations
 
@@ -451,7 +601,17 @@ User Request
 
 ### Security Controls
 
-#### 1. Command Validation
+#### 1. Command Validation (Phase 1 Security Module)
+
+**Implementation**: [`SecureCommandExecutor`](vulnguard/pkg/security/command_executor.py:47)
+
+**Key Security Features**:
+- **Never uses shell=True** - All commands executed with `shell=False`
+- **Parameterized execution** - Commands passed as list of arguments
+- **Allow-list enforcement** - Only approved commands can execute
+- **Block-list enforcement** - Dangerous patterns explicitly blocked
+- **Input sanitization** - All inputs validated and sanitized
+- **Audit logging** - All command executions logged
 
 **Allow-List**:
 - Only commands matching allow-list patterns can be executed
@@ -465,22 +625,62 @@ User Request
 
 **Default Allow-List Patterns**:
 ```python
-r'^systemctl\s+(enable|disable|start|stop|restart|status)\s+[a-zA-Z0-9_-]+$'
-r'^sysctl\s+-w\s+[a-zA-Z0-9._-]+=.+$'
-r'^chmod\s+[0-7]{3,4}\s+[a-zA-Z0-9_./-]+$'
-r'^chown\s+[a-zA-Z0-9_:.-]+\s+[a-zA-Z0-9_./-]+$'
-r'^sed\s+-i\s+.+\s+[a-zA-Z0-9_./-]+$'
-r'^echo\s+.+\s*>>?\s*[a-zA-Z0-9_./-]+$'
+r'^systemctl$'
+r'^sysctl$'
+r'^chmod$'
+r'^chown$'
+r'^sed$'
+r'^echo$'
+r'^cat$'
+r'^grep$'
+r'^awk$'
+r'^stat$'
+r'^ls$'
+r'^find$'
+r'^test$'
+r'\['
+r'^which$'
+r'^id$'
+r'^whoami$'
+r'^hostname$'
+r'^uname$'
+r'^df$'
+r'^du$'
+r'^mount$'
+r'^umount$'
+r'^ps$'
+r'^netstat$'
+r'^ss$'
+r'^ip$'
+r'^getent$'
+r'^pwd$'
 ```
 
 **Default Block-List Patterns**:
 ```python
-r'rm\s+-rf'
-r'chmod\s+777'
-r'userdel'
-r'groupdel'
-r'passwd\s+-l\s+root'
-r'setenforce\s+0'
+r'^rm\s+-rf\s*/'
+r'^chmod\s+777'
+r'^dd\s+'
+r'^mkfs'
+r'^fdisk'
+r'^userdel'
+r'^groupdel'
+r'^passwd\s+-l\s+root'
+r'^setenforce\s+0'
+r'^iptables\s+-F'
+r':(){:|:&};:',  # Shellshock
+r'eval\s*\('
+r'exec\s*\('
+r'\$\('
+r'`[^`]*`',  # Backtick command substitution
+r';\s*rm\s'
+r'&&\s*rm\s'
+r'\|\|\s*rm\s'
+r'>\s*/dev/'
+r'>>\s*/etc/'
+r'nc\s+-l',  # Netcat listener
+r'ncat\s+-l'
+r'socat\s+TCP-LISTEN'
 ```
 
 #### 2. Approval Gating
@@ -504,7 +704,44 @@ Rules requiring approval:
 - Automatic rollback on failure
 - Backup retention policy
 
-#### 5. Audit Logging
+#### 5. File and Directory Permissions (Phase 1 Security Module)
+
+**Implementation**: [`SecureFilePermissions`](vulnguard/pkg/security/file_permissions.py:41)
+
+**Key Security Features**:
+- **Secure defaults** - Files: 0600, Directories: 0700
+- **Explicit permission setting** - All operations specify permissions
+- **Permission verification** - Verifies permissions after creation
+- **Audit capabilities** - Can audit directory permissions
+- **Cross-platform support** - Works consistently across platforms
+
+**Default Permissions**:
+- Files: 0600 (rw-------, owner read/write only)
+- Directories: 0700 (rwx------, owner read/write/execute only)
+- Maximum allowed for files: 0o644 (rw-r--r--)
+- Maximum allowed for directories: 0o755 (rwxr-xr-x)
+
+#### 6. Atomic File Operations (Phase 1 Security Module)
+
+**Implementation**: [`AtomicFileOperations`](vulnguard/pkg/security/atomic_operations.py:41)
+
+**Key Security Features**:
+- **Atomic operations** - Uses `os.replace()`, `open(..., mode='x')`
+- **Eliminates race conditions** - Check and use in single operation
+- **Safe file patterns** - Temporary file patterns for updates
+- **Backup support** - Optional backup before operations
+- **Error handling** - Proper cleanup on failures
+
+**Available Operations**:
+- `atomic_read()` - Atomically read a file
+- `atomic_write()` - Atomically write content to a file
+- `atomic_create()` - Atomically create a new file (fails if exists)
+- `atomic_append()` - Atomically append content to a file
+- `atomic_replace()` - Atomically replace a file with another
+- `atomic_copy()` - Atomically copy a file to a new location
+- `atomic_delete()` - Atomically delete a file
+
+#### 7. Audit Logging
 
 - Complete audit trail of all actions
 - JSON-line format for easy parsing

@@ -4,7 +4,7 @@ title: "The SSH daemon must not permit password-based authentication."
 severity: critical
 original_severity: "CAT I"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Password-based authentication is vulnerable to brute force attacks. Public key authentication is more secure."
 check:
   type: file

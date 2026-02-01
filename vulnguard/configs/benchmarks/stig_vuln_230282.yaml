@@ -4,7 +4,7 @@ title: "The SSH daemon must not permit X11 forwarding."
 severity: medium
 original_severity: "CAT III"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "X11 forwarding can be exploited for unauthorized access to the X11 display server."
 check:
   type: file

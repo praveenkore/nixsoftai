@@ -26,8 +26,17 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from pythonjsonlogger import jsonlogger
+
+# Forward reference for type checking
+if TYPE_CHECKING:
+    AuditLogger = Any
+
+# Lazy import to avoid circular dependency
+def _get_secure_file_permissions():
+    from vulnguard.pkg.security.file_permissions import SecureFilePermissions
+    return SecureFilePermissions
 
 
 class AuditLogger:
@@ -60,9 +69,21 @@ class AuditLogger:
         self.log_level = getattr(logging, log_level.upper(), logging.INFO)
         self.log_format = log_format
         
-        # Ensure log directory exists
+        # Ensure log directory exists with secure permissions using lazy import
         log_dir = Path(log_file).parent
-        log_dir.mkdir(parents=True, exist_ok=True)
+        # Create directory with secure permissions, avoiding race condition using umask
+        if not log_dir.exists():
+            # Set umask to 077 so directory is created with 700 permissions
+            old_umask = os.umask(0o077)
+            try:
+                log_dir.mkdir(parents=True, exist_ok=True)
+            finally:
+                os.umask(old_umask)
+            
+            # Double check permissions just in case
+            current_perms = os.stat(log_dir).st_mode & 0o777
+            if current_perms != 0o700:
+                os.chmod(str(log_dir), 0o700)
         
         # Create logger
         self.logger = logging.getLogger("vulnguard")
@@ -127,6 +148,48 @@ class AuditLogger:
         log_method = getattr(self.logger, level.lower(), self.logger.info)
         log_method(json.dumps(log_entry))
     
+    def log_info(
+        self,
+        message: str,
+        event_type: str = "general",
+        data: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Convenience method to log an info message.
+        
+        Args:
+            message: Human-readable message
+            event_type: Type of event (default: "general")
+            data: Optional structured data
+        """
+        self._log(
+            level="info",
+            event_type=event_type,
+            data=data or {},
+            message=message
+        )
+    
+    def log_warning(
+        self,
+        message: str,
+        event_type: str = "general",
+        data: Optional[Dict[str, Any]] = None
+    ) -> None:
+        """
+        Convenience method to log a warning message.
+        
+        Args:
+            message: Human-readable message
+            event_type: Type of event (default: "general")
+            data: Optional structured data
+        """
+        self._log(
+            level="warning",
+            event_type=event_type,
+            data=data or {},
+            message=message
+        )
+
     def log_scan_start(
         self,
         benchmark: str,

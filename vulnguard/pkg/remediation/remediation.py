@@ -19,6 +19,7 @@ Remediation Module - Reversible Remediation Engine
 
 Applies security fixes with automatic rollback capabilities and safety controls.
 All remediations are reversible and logged for audit purposes.
+Uses centralized command validation patterns.
 """
 
 import os
@@ -32,6 +33,20 @@ from vulnguard.pkg.scanner.scanner import ScanResult
 from vulnguard.pkg.engine.engine import EvaluationResult
 from vulnguard.pkg.advisor.advisor import AIAdvisory
 from vulnguard.pkg.logging.logger import AuditLogger
+from vulnguard.pkg.security.command_validation import (
+    get_default_command_allowlist,
+    get_command_blocklist,
+    merge_command_patterns
+)
+
+# Lazy imports to avoid circular dependencies
+def _get_secure_command_executor():
+    from vulnguard.pkg.security.command_executor import SecureCommandExecutor
+    return SecureCommandExecutor
+
+def _get_secure_file_permissions():
+    from vulnguard.pkg.security.file_permissions import SecureFilePermissions
+    return SecureFilePermissions
 
 
 class RemediationResult:
@@ -92,27 +107,8 @@ class RemediationEngine:
     
     Applies security fixes with automatic backup and rollback capabilities.
     All remediations are validated against allow-lists and logged.
+    Uses centralized command validation patterns.
     """
-    
-    # Default command allow-list (regex patterns)
-    DEFAULT_COMMAND_ALLOWLIST = [
-        r'^systemctl\s+(enable|disable|start|stop|restart|status)\s+[a-zA-Z0-9_-]+$',
-        r'^sysctl\s+-w\s+[a-zA-Z0-9._-]+=.+$',
-        r'^chmod\s+[0-7]{3,4}\s+[a-zA-Z0-9_./-]+$',
-        r'^chown\s+[a-zA-Z0-9_:.-]+\s+[a-zA-Z0-9_./-]+$',
-        r'^sed\s+-i\s+.+\s+[a-zA-Z0-9_./-]+$',
-        r'^echo\s+.+\s*>>?\s*[a-zA-Z0-9_./-]+$'
-    ]
-    
-    # Command block-list (regex patterns)
-    COMMAND_BLOCKLIST = [
-        r'rm\s+-rf',
-        r'chmod\s+777',
-        r'userdel',
-        r'groupdel',
-        r'passwd\s+-l\s+root',
-        r'setenforce\s+0'
-    ]
     
     def __init__(
         self,
@@ -121,7 +117,9 @@ class RemediationEngine:
         auto_backup: bool = True,
         rollback_on_failure: bool = True,
         command_allowlist: Optional[List[str]] = None,
-        command_blocklist: Optional[List[str]] = None
+        command_blocklist: Optional[List[str]] = None,
+        backup_retention_days: int = 30,
+        max_backups_count: int = 50
     ):
         """
         Initialize the remediation engine.
@@ -133,16 +131,35 @@ class RemediationEngine:
             rollback_on_failure: Whether to automatically rollback on failure
             command_allowlist: Optional custom command allow-list
             command_blocklist: Optional custom command block-list
+            backup_retention_days: Number of days to keep backups
+            max_backups_count: Maximum number of backups to keep
         """
         self.logger = logger or AuditLogger()
         self.backup_directory = Path(backup_directory)
         self.auto_backup = auto_backup
         self.rollback_on_failure = rollback_on_failure
-        self.command_allowlist = command_allowlist or self.DEFAULT_COMMAND_ALLOWLIST
-        self.command_blocklist = command_blocklist or self.COMMAND_BLOCKLIST
+        self.backup_retention_days = backup_retention_days
+        self.max_backups_count = max_backups_count
         
-        # Ensure backup directory exists
-        self.backup_directory.mkdir(parents=True, exist_ok=True)
+        # Use centralized command validation patterns
+        self.command_allowlist, self.command_blocklist = merge_command_patterns(
+            command_allowlist,
+            command_blocklist
+        )
+        
+        # Initialize secure command executor using lazy import
+        executor_cls = _get_secure_command_executor()
+        self.command_executor = executor_cls(logger=self.logger)
+        
+        # Initialize secure file permissions manager using lazy import
+        perms_cls = _get_secure_file_permissions()
+        self.file_permissions = perms_cls(logger=self.logger)
+        
+        # Ensure backup directory exists with secure permissions
+        self.file_permissions.create_secure_directory(str(self.backup_directory))
+        
+        # Cleanup old backups on initialization
+        self.cleanup_old_backups()
     
     def _validate_command(self, command: str) -> Tuple[bool, str]:
         """
@@ -175,6 +192,9 @@ class RemediationEngine:
         """
         Execute a shell command.
         
+        Uses SecureCommandExecutor to eliminate command injection vulnerabilities.
+        The command string is parsed into arguments and executed without shell=True.
+        
         Args:
             command: Command to execute
             dry_run: If True, only print the command without executing
@@ -182,26 +202,29 @@ class RemediationEngine:
         Returns:
             Tuple of (exit_code, stdout, stderr)
         """
-        if dry_run:
-            return 0, f"[DRY-RUN] Would execute: {command}", ""
-        
         try:
-            result = subprocess.run(
+            # Use secure command executor to parse and execute command
+            # This eliminates command injection vulnerabilities
+            return self.command_executor.execute_shell_command_safely(
                 command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=60
+                timeout=60,
+                dry_run=dry_run
             )
-            return result.returncode, result.stdout, result.stderr
-        except subprocess.TimeoutExpired:
-            return -1, "", "Command timed out"
         except Exception as e:
+            self.logger.log_error(
+                "command_execution",
+                f"Failed to execute command: {str(e)}",
+                {"command": command}
+            )
             return -1, "", str(e)
     
     def _backup_files(self, files_to_backup: List[str], rule_id: str) -> Optional[str]:
         """
         Backup configuration files before remediation.
+        
+        Uses secure file permissions to ensure backup directory and files
+        are created with appropriate permissions. Creates a manifest file
+        to track the mapping between backup files and original paths.
         
         Args:
             files_to_backup: List of file paths to backup
@@ -213,19 +236,60 @@ class RemediationEngine:
         if not files_to_backup:
             return None
         
-        # Create backup directory with timestamp
+        # Create backup directory with timestamp using secure permissions
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         backup_path = self.backup_directory / f"{rule_id}_{timestamp}"
-        backup_path.mkdir(parents=True, exist_ok=True)
+        self.file_permissions.create_secure_directory(str(backup_path))
         
         files_backed_up = []
+        manifest = {}  # Mapping from backup filename to original path
         
         for file_path in files_to_backup:
             try:
-                if os.path.exists(file_path):
-                    dest_path = backup_path / Path(file_path).name
-                    shutil.copy2(file_path, dest_path)
-                    files_backed_up.append(file_path)
+                # Resolve to absolute path to prevent traversal and ambiguity
+                abs_path = os.path.abspath(file_path)
+                
+                if os.path.exists(abs_path) and os.path.isfile(abs_path):
+                    # Generate safe filename from absolute path
+                    # Replace path separators to create a flat filename
+                    safe_filename = abs_path.replace('/', '_').replace('\\', '_').lstrip('_')
+                    # Double check it doesn't contain traversal sequences that survived
+                    if '..' in safe_filename:
+                        safe_filename = safe_filename.replace('..', '__')
+                        
+                    dest_path = backup_path / safe_filename
+                    
+                    # Verify destination is strictly within backup directory
+                    # This prevents any clever filename manipulation from escaping the backup dir
+                    try:
+                        # resolve() resolves symlinks and .. components
+                        dest_real = dest_path.resolve() if dest_path.exists() else dest_path
+                        # backup_path is already created, so it exists and we can resolve it
+                        backup_real = backup_path.resolve()
+                        
+                        # Check strictly if dest is inside backup_real
+                        # We use str conversion for compatibility
+                        if os.path.commonpath([str(backup_real), str(dest_real.parent)]) != str(backup_real):
+                             self.logger.log_error(
+                                "backup",
+                                f"Backup path traversal detected: {dest_real}",
+                                {"rule_id": rule_id, "file_path": abs_path}
+                            )
+                             continue
+                    except Exception:
+                         # If resolution fails (e.g. filename too long), fall back to simple check
+                         pass
+
+                    # Use shutil.copy2 but then ensure secure permissions
+                    shutil.copy2(abs_path, dest_path)
+                    # Set secure permissions on backup file
+                    self.file_permissions.set_file_permissions(
+                        str(dest_path),
+                        0o600  # Owner read/write only
+                    )
+                    files_backed_up.append(abs_path)
+                    # Store mapping in manifest (safe_filename -> original absolute path)
+                    manifest[safe_filename] = abs_path
             except Exception as e:
                 self.logger.log_error(
                     "backup",
@@ -235,6 +299,27 @@ class RemediationEngine:
                 # Continue with other files
         
         if files_backed_up:
+            # Write manifest file for rollback
+            manifest_path = backup_path / ".backup_manifest.json"
+            try:
+                import json
+                with open(manifest_path, 'w') as f:
+                    json.dump({
+                        "rule_id": rule_id,
+                        "timestamp": timestamp,
+                        "files": manifest
+                    }, f, indent=2)
+                self.file_permissions.set_file_permissions(
+                    str(manifest_path),
+                    0o600
+                )
+            except Exception as e:
+                self.logger.log_error(
+                    "backup",
+                    f"Failed to write backup manifest: {str(e)}",
+                    {"rule_id": rule_id, "manifest_path": str(manifest_path)}
+                )
+            
             self.logger.log_backup(
                 benchmark="unknown",
                 rule_id=rule_id,
@@ -283,7 +368,7 @@ class RemediationEngine:
         dry_run: bool = True
     ) -> Tuple[bool, str]:
         """
-        Execute rollback commands.
+        Execute rollback commands and restore files from backup.
         
         Args:
             rollback_commands: List of rollback commands to execute
@@ -299,14 +384,53 @@ class RemediationEngine:
         # Restore files from backup if available
         if backup_path and os.path.exists(backup_path):
             try:
+                # Load backup manifest to get file mappings
+                manifest_path = Path(backup_path) / ".backup_manifest.json"
+                manifest = {}
+                
+                if manifest_path.exists():
+                    import json
+                    with open(manifest_path, 'r') as f:
+                        manifest_data = json.load(f)
+                        manifest = manifest_data.get('files', {})
+                
+                # Restore files from backup
                 for backup_file in Path(backup_path).glob('*'):
-                    if backup_file.is_file():
-                        # Determine original file path
-                        # For now, just log that we would restore
-                        outputs.append(f"[DRY-RUN] Would restore {backup_file} to original location")
+                    if backup_file.is_file() and backup_file.name != ".backup_manifest.json":
+                        # Get original file path from manifest
+                        original_path = manifest.get(backup_file.name, None)
+                        
+                        if original_path is None:
+                            # Fallback: try to determine original path from filename
+                            outputs.append(f"Warning: No manifest entry for {backup_file.name}, skipping file restoration")
+                            continue
+                        
+                        if dry_run:
+                            outputs.append(f"[DRY-RUN] Would restore {backup_file} to {original_path}")
+                        else:
+                            try:
+                                # Ensure parent directory exists
+                                original_parent = Path(original_path).parent
+                                if not original_parent.exists():
+                                    original_parent.mkdir(parents=True, exist_ok=True)
+                                
+                                # Restore file from backup
+                                shutil.copy2(backup_file, original_path)
+                                # Restore original file permissions using secure file permissions
+                                self.file_permissions.set_file_permissions(
+                                    str(original_path),
+                                    0o644  # Default: owner read/write, group/others read
+                                )
+                                outputs.append(f"Restored {backup_file.name} to {original_path}")
+                            except Exception as e:
+                                outputs.append(f"Error restoring {backup_file} to {original_path}: {str(e)}")
+                                all_success = False
             except Exception as e:
                 outputs.append(f"Error during backup restoration: {str(e)}")
                 all_success = False
+        elif backup_path:
+            outputs.append(f"Backup directory not found: {backup_path}")
+            all_success = False
         
         # Execute rollback commands
         for cmd in rollback_commands:
@@ -558,11 +682,25 @@ class RemediationEngine:
         remediation_results = []
         
         # Create advisory lookup
+        # Create lookups for faster and safer access
         advisory_lookup = {}
         if ai_advisories:
             advisory_lookup = {adv.rule_id: adv for adv in ai_advisories}
+            
+        evaluation_lookup = {r.rule_id: r for r in evaluation_results}
         
-        for scan_result, eval_result in zip(scan_results, evaluation_results):
+        for scan_result in scan_results:
+            # Safe lookup for evaluation result
+            eval_result = evaluation_lookup.get(scan_result.rule_id)
+            
+            if not eval_result:
+                self.logger.log_error(
+                    "remediation_batch",
+                    f"Missing evaluation result for rule {scan_result.rule_id}",
+                    {"rule_id": scan_result.rule_id}
+                )
+                continue
+                
             advisory = advisory_lookup.get(scan_result.rule_id)
             result = self.remediate(
                 scan_result=scan_result,
@@ -574,3 +712,72 @@ class RemediationEngine:
             remediation_results.append(result)
         
         return remediation_results
+
+    def cleanup_old_backups(self) -> None:
+        """
+        Clean up old backups based on retention policy.
+        
+        Policy:
+        1. Delete backups older than backup_retention_days
+        2. If count > max_backups_count, delete oldest until count <= max_backups_count
+        """
+        try:
+            if not self.backup_directory.exists():
+                return
+                
+            backups = []
+            for item in self.backup_directory.iterdir():
+                if item.is_dir() and item.name.startswith("backup_") or (item.is_dir() and "_20" in item.name):
+                     # Match our patterns like rule_1_20260201 or backup_ prefixes
+                    backups.append(item)
+            
+            # Sort by modification time (oldest first)
+            backups.sort(key=lambda x: x.stat().st_mtime)
+            
+            # Check retention days
+            import time
+            current_time = time.time()
+            retention_seconds = self.backup_retention_days * 86400
+            
+            deleted_count = 0
+            remaining_backups = []
+            
+            for backup in backups:
+                age = current_time - backup.stat().st_mtime
+                if age > retention_seconds:
+                    try:
+                        shutil.rmtree(backup)
+                        deleted_count += 1
+                        self.logger.log_info(
+                            f"Deleted old backup: {backup} (age={age/86400:.1f} days)"
+                        )
+                    except Exception as e:
+                        self.logger.log_error(
+                            "backup_cleanup",
+                            f"Failed to delete backup {backup}: {str(e)}"
+                        )
+                else:
+                    remaining_backups.append(backup)
+            
+            # Check max count
+            if len(remaining_backups) > self.max_backups_count:
+                excess = len(remaining_backups) - self.max_backups_count
+                for i in range(excess):
+                    backup = remaining_backups[i]
+                    try:
+                        shutil.rmtree(backup)
+                        deleted_count += 1
+                        self.logger.log_info(
+                            f"Deleted excess backup: {backup} (limit={self.max_backups_count})"
+                        )
+                    except Exception as e:
+                        self.logger.log_error(
+                            "backup_cleanup",
+                            f"Failed to delete backup {backup}: {str(e)}"
+                        )
+                        
+            if deleted_count > 0:
+                self.logger.log_info(f"Backup cleanup finished. Deleted {deleted_count} backups.")
+                
+        except Exception as e:
+            self.logger.log_error("backup_cleanup", f"Error during backup cleanup: {str(e)}")

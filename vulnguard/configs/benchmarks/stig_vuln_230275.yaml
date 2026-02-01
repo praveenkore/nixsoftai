@@ -4,7 +4,7 @@ title: "The SSH daemon must not permit root logins."
 severity: critical
 original_severity: "CAT I"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Permitting root login via SSH increases the attack surface and allows direct access to privileged accounts."
 check:
   type: file

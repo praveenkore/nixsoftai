@@ -4,7 +4,7 @@ title: "The operating system must configure kernel parameters to enable SYN cook
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "SYN cookies help protect against SYN flood attacks by using cryptographic cookies."
 check:
   type: sysctl

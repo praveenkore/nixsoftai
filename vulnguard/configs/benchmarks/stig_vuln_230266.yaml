@@ -4,7 +4,7 @@ title: "The operating system must configure kernel parameters to disable ICMP re
 severity: medium
 original_severity: "CAT III"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "ICMP redirects can be exploited for man-in-the-middle attacks and should be disabled."
 check:
   type: sysctl

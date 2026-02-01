@@ -4,7 +4,7 @@ title: "The operating system must configure automatic security updates."
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Automatic security updates ensure that security patches are applied in a timely manner."
 check:
   type: file

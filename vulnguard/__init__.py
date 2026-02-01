@@ -24,5 +24,5 @@ This system is designed for high-trust, regulated environments with strict safet
 controls and deterministic logic.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Nixsoft Technologies Pvt. Ltd."

@@ -4,7 +4,7 @@ title: "The operating system must configure kernel parameters to prevent IP spoo
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Reverse path filtering prevents IP spoofing attacks by verifying that source addresses are reachable via the interface they arrived on."
 check:
   type: sysctl

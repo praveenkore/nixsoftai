@@ -46,7 +46,9 @@ if TYPE_CHECKING:
 
 # Global HTTP client pool for connection pooling
 _http_client_pool: Dict[str, Any] = {}
+_http_client_last_access: Dict[str, float] = {}
 _http_client_lock = threading.Lock()
+MAX_POOL_SIZE = 10
 
 
 class RateLimiter:
@@ -202,6 +204,23 @@ def get_shared_http_client(
     endpoint_key = endpoint.rstrip('/')
     
     with _http_client_lock:
+        current_time = time.time()
+        
+        # Cleanup mechanism: Evict LRU if pool is full and we need to add a new one
+        if endpoint_key not in _http_client_pool and len(_http_client_pool) >= MAX_POOL_SIZE:
+            # Find least recently used key
+            # Sort keys by access time
+            sorted_keys = sorted(_http_client_last_access.keys(), key=lambda k: _http_client_last_access[k])
+            
+            # Remove oldest (first in sorted list)
+            lru_key = sorted_keys[0]
+            try:
+                _http_client_pool[lru_key].close()
+            except Exception:
+                pass # Ignore close errors
+            del _http_client_pool[lru_key]
+            del _http_client_last_access[lru_key]
+
         if endpoint_key not in _http_client_pool:
             # Configure connection limits
             limits = limits or {
@@ -214,6 +233,9 @@ def get_shared_http_client(
                 timeout=timeout,
                 limits=httpx.Limits(**limits)
             )
+        
+        # Update last access time
+        _http_client_last_access[endpoint_key] = current_time
         
         return _http_client_pool[endpoint_key]
 

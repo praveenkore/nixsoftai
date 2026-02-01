@@ -8,6 +8,7 @@
   - Type hints for all function signatures
   - PEP 8 compliance enforced
   - Object-oriented design patterns
+  - Concurrent execution (`concurrent.futures`) for I/O operations
 
 ### Core Dependencies
 

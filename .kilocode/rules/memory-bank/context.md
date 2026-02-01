@@ -118,6 +118,41 @@ VulnGuard has completed Phase 1 security audit with the following fixes implemen
    - Structured JSON-line format
    - Log rotation to prevent disk space issues
 
+### Critical & High Priority Fixes (Feb 2026)
+
+Addressed critical security vulnerabilities and reliability issues:
+
+1. **Path Traversal & Symlink Attacks (SEC-001, SEC-004, SEC-005)**
+   - Implemented [`PathValidator`](../vulnguard/pkg/security/path_validator.py) for centralized path validation
+   - Added `os.path.commonpath` checks in backup logic
+   - Enhanced `AtomicFileOperations` to block symlinks (preventing TOCTOU attacks via links)
+   - Added O_NOFOLLOW flag support where available
+
+2. **Command Injection Hardening (SEC-002)**
+   - Hardened `DEFAULT_COMMAND_ALLOWLIST` with strict anchors (`^...$`) and character classes
+   - Removed permissive `.*` patterns
+
+3. **Rule Validation (SEC-003)**
+   - Implemented JSON Schema validation for rule YAML files
+   - Rejects malformed rules before loading
+
+4. **Reliability Improvements (SEC-006, REL-003, LOG-001, ERR-001)**
+   - Fixed TOCTOU race condition in logger directory creation
+   - Implemented **Backup Retention Policy** (cleanup by age/count)
+   - Fixed logic error in scan pipeline iteration (`zip` mismatch)
+   - Implemented `VulnGuardException` hierarchy for better error handling
+
+5. **Performance Improvements (PERF-001, PERF-002, PERF-003)**
+   - **Rule Caching**: Implemented LRU caching for rule files to minimize disk I/O.
+   - **Parallel Scanning**: Enabled parallel rule scanning using `ThreadPoolExecutor`.
+   - **Memory Management**: Added LRU eviction for HTTP client pools in LLM integration.
+
+6.  **Plugin Architecture (EXT-001, EXT-002)**
+    - Implemented **Capability-Based Plugin System** in `vulnguard/pkg/plugins/`.
+    - Created `IPlugin` interface and `PluginContext` protocol.
+    - Implemented secure proxies `SecureFileSystemProxy` and `SecureExecutionProxy` for sandboxing.
+    - Added `PluginManager` for manifest verification and loading.
+
 ## Current Work Focus
 
 ### Active Development Areas

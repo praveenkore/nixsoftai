@@ -4,7 +4,7 @@ title: "The operating system must use a file integrity tool to verify correct op
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "AIDE is a file integrity tool that monitors changes to critical system files, directories, and configurations. Without file integrity monitoring, unauthorized changes to system files may go undetected."
 check:
   type: command

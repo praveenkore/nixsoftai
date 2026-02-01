@@ -4,7 +4,7 @@ title: "The operating system must configure kernel parameters to enable ASLR."
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Address Space Layout Randomization (ASLR) makes it harder for attackers to predict memory addresses."
 check:
   type: sysctl

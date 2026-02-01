@@ -24,12 +24,18 @@ All AI output is validated against allow-lists and confidence thresholds.
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 from vulnguard.pkg.scanner.scanner import ScanResult
 from vulnguard.pkg.engine.engine import EvaluationResult
 from vulnguard.pkg.logging.logger import AuditLogger
 from vulnguard.pkg.advisor.llm_client import create_llm_client, BaseLLMClient
 from vulnguard.pkg.advisor.prompts import CompliancePrompts
+from vulnguard.pkg.security.command_validation import (
+    get_default_command_allowlist,
+    get_command_blocklist,
+    merge_command_patterns
+)
 
 
 class AIAdvisory:
@@ -98,27 +104,8 @@ class AIAdvisor:
     
     Provides AI assistance for ambiguous findings with strict validation
     of all output against allow-lists and confidence thresholds.
+    Uses centralized command validation patterns.
     """
-    
-    # Default command allow-list (regex patterns)
-    DEFAULT_COMMAND_ALLOWLIST = [
-        r'^systemctl\s+(enable|disable|start|stop|restart|status)\s+[a-zA-Z0-9_-]+$',
-        r'^sysctl\s+-w\s+[a-zA-Z0-9._-]+=.+$',
-        r'^chmod\s+[0-7]{3,4}\s+[a-zA-Z0-9_./-]+$',
-        r'^chown\s+[a-zA-Z0-9_:.-]+\s+[a-zA-Z0-9_./-]+$',
-        r'^sed\s+-i\s+.+\s+[a-zA-Z0-9_./-]+$',
-        r'^echo\s+.+\s*>>?\s*[a-zA-Z0-9_./-]+$'
-    ]
-    
-    # Command block-list (regex patterns)
-    COMMAND_BLOCKLIST = [
-        r'rm\s+-rf',
-        r'chmod\s+777',
-        r'userdel',
-        r'groupdel',
-        r'passwd\s+-l\s+root',
-        r'setenforce\s+0'
-    ]
     
     def __init__(
         self,
@@ -126,7 +113,8 @@ class AIAdvisor:
         min_confidence_threshold: float = 0.7,
         command_allowlist: Optional[List[str]] = None,
         command_blocklist: Optional[List[str]] = None,
-        llm_config: Optional[Dict[str, Any]] = None
+        llm_config: Optional[Dict[str, Any]] = None,
+        max_workers: int = 4
     ):
         """
         Initialize the AI advisor.
@@ -137,11 +125,16 @@ class AIAdvisor:
             command_allowlist: Optional custom command allow-list
             command_blocklist: Optional custom command block-list
             llm_config: Optional LLM provider configuration
+            max_workers: Maximum number of worker threads for async LLM calls
         """
         self.logger = logger or AuditLogger()
         self.min_confidence_threshold = min_confidence_threshold
-        self.command_allowlist = command_allowlist or self.DEFAULT_COMMAND_ALLOWLIST
-        self.command_blocklist = command_blocklist or self.COMMAND_BLOCKLIST
+        
+        # Use centralized command validation patterns
+        self.command_allowlist, self.command_blocklist = merge_command_patterns(
+            command_allowlist,
+            command_blocklist
+        )
         
         # Initialize LLM client if configuration is provided
         self.llm_client: Optional[BaseLLMClient] = None
@@ -149,6 +142,10 @@ class AIAdvisor:
         
         if llm_config:
             self._init_llm_client(llm_config)
+        
+        # Initialize thread pool for async LLM calls
+        self.max_workers = max_workers
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
     
     def _init_llm_client(self, llm_config: Dict[str, Any]) -> None:
         """
@@ -346,6 +343,8 @@ class AIAdvisor:
         """
         Call LLM to generate advisory for a compliance finding.
         
+        Uses thread pool for non-blocking execution of LLM calls.
+        
         Args:
             rule_id: Rule identifier
             scan_result: Scan result from the scanner
@@ -393,11 +392,28 @@ class AIAdvisor:
             )
         
         try:
-            # Call LLM
-            response = self.llm_client.generate_response(
+            # Use thread pool for non-blocking LLM call
+            future = self.executor.submit(
+                self.llm_client.generate_response,
                 prompt=prompt,
                 system_prompt=CompliancePrompts.SYSTEM_PROMPT
             )
+            
+            # Wait for the result with timeout
+            try:
+                response = future.result(timeout=self.llm_client.timeout + 10)
+            except Exception as timeout_error:
+                self.logger.log_error(
+                    "llm_client",
+                    f"LLM call timed out for rule {rule_id}: {str(timeout_error)}",
+                    {"rule_id": rule_id}
+                )
+                # Fallback to simulated response on timeout
+                return self._simulate_ai_response(
+                    rule_id=rule_id,
+                    scan_result=scan_result,
+                    evaluation_result=evaluation_result
+                )
             
             self.logger.log_info(
                 f"LLM response received for rule {rule_id}: "

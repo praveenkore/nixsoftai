@@ -4,7 +4,7 @@ title: "The SSH daemon must ignore .rhosts files."
 severity: medium
 original_severity: "CAT III"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Ignoring .rhosts files prevents authentication based on potentially insecure host-based trust relationships."
 check:
   type: file

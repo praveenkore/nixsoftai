@@ -6,7 +6,7 @@ A production-grade Linux Security Compliance Agent that audits, evaluates, and r
 
 ## Version
 
-**VulnGuard v1.0.0**
+**VulnGuard v1.1.0**
 
 ## Overview
 
@@ -17,7 +17,9 @@ VulnGuard is designed for high-trust, regulated environments with strict safety 
 - Reversible remediation with automatic rollback
 - Approval gating for high-risk changes
 - Comprehensive audit logging in JSON-line format
+
 - Support for CIS and STIG benchmarks
+- **High Performance**: Parallel scanning and intelligent caching
 
 ## Design Philosophy
 
@@ -67,6 +69,8 @@ Key configuration options:
 - **ai.min_confidence_threshold**: Minimum AI confidence threshold (default: 0.7)
 - **remediation.command_allowlist**: Regex patterns for allowed commands
 - **remediation.command_blocklist**: Regex patterns for blocked commands
+- **remediation.backup_retention_days**: Retention period for backups (default: 30)
+- **remediation.max_backups_count**: Maximum number of backups to keep (default: 50)
 
 ## CLI Usage
 
@@ -214,6 +218,18 @@ These commands are explicitly blocked:
 - Critical severity rules require approval
 - Rules with `approval_required: true` require approval
 
+### File System Security
+
+- **Path Validation**:
+  - Centralized path validation to prevent traversal attacks
+  - Checks for symlink protection
+  - Verifies operations stay within allowed directories
+
+- **Atomic Operations**:
+  - `os.replace` for atomic file updates (TOCTOU prevention)
+  - `os.umask(0o077)` for atomic secure directory creation
+  - `O_NOFOLLOW` flag to block symlink attacks
+
 ### AI Confidence Threshold
 
 - Default threshold: 0.7
@@ -253,6 +269,13 @@ vulnguard/
 │   │   └── remediation.py
 │   └── logging/                     # Structured Audit Logger
 │       └── logger.py
+├── pkg/
+│   └── security/                    # Security Hardening (New)
+│       ├── path_validator.py        # Path safety & traversal prevention
+│       ├── atomic_operations.py     # Symlink-safe atomic ops
+│       ├── file_permissions.py      # Secure permission enforcement
+│       ├── command_executor.py      # Secure command execution
+│       └── command_validation.py    # Command regex validation
 ├── configs/
 │   ├── agent/                       # Global agent config
 │   │   └── config.yaml

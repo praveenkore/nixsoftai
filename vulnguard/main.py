@@ -30,12 +30,123 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import click
+import jsonschema
 
 from vulnguard.pkg.scanner.scanner import Scanner, ScanResult
 from vulnguard.pkg.engine.engine import ComplianceEngine, EvaluationResult
 from vulnguard.pkg.advisor.advisor import AIAdvisor, AIAdvisory
 from vulnguard.pkg.remediation.remediation import RemediationEngine, RemediationResult
 from vulnguard.pkg.logging.logger import AuditLogger
+from vulnguard.pkg.exceptions import (
+    VulnGuardException,
+    ConfigurationError,
+    ScanError,
+    RemediationError
+)
+
+
+# Configuration schema for validation
+CONFIG_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "agent": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "version": {"type": "string"},
+                "mode": {"type": "string", "enum": ["dry-run", "commit"]}
+            },
+            "required": ["name", "version", "mode"]
+        },
+        "logging": {
+            "type": "object",
+            "properties": {
+                "level": {"type": "string", "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]},
+                "format": {"type": "string", "enum": ["json", "text"]},
+                "max_size_mb": {"type": "number", "minimum": 1},
+                "backup_count": {"type": "number", "minimum": 1}
+            }
+        },
+        "ai": {
+            "type": "object",
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "provider": {"type": "string", "enum": ["openai", "anthropic", "openrouter", "ollama", "local", "mock"]},
+                "min_confidence_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "max_retries": {"type": "number", "minimum": 0, "maximum": 10},
+                "rate_limit": {"type": "number", "minimum": 1},
+                "timeout_seconds": {"type": "number", "minimum": 1},
+                "openai": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "model": {"type": "string"},
+                        "api_endpoint": {"type": "string", "format": "uri"}
+                    }
+                },
+                "anthropic": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "model": {"type": "string"},
+                        "api_endpoint": {"type": "string", "format": "uri"}
+                    }
+                },
+                "openrouter": {
+                    "type": "object",
+                    "properties": {
+                        "api_key": {"type": "string"},
+                        "model": {"type": "string"},
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "site_url": {"type": "string", "format": "uri"}
+                    }
+                },
+                "ollama": {
+                    "type": "object",
+                    "properties": {
+                        "api_endpoint": {"type": "string", "format": "uri"},
+                        "model": {"type": "string"}
+                    }
+                },
+                "local": {
+                    "type": "object",
+                    "properties": {
+                        "model_path": {"type": "string"},
+                        "model_type": {"type": "string"},
+                        "device": {"type": "string", "enum": ["auto", "cuda", "cpu"]}
+                    }
+                }
+            }
+        },
+        "remediation": {
+            "type": "object",
+            "properties": {
+                "default_mode": {"type": "string", "enum": ["dry-run", "commit"]},
+                "auto_backup": {"type": "boolean"},
+                "rollback_on_failure": {"type": "boolean"},
+                "backup_directory": {"type": "string"},
+                "command_allowlist": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "command_blocklist": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            }
+        },
+        "severity_mapping": {
+            "type": "object",
+            "properties": {
+                "low": {"type": "number", "minimum": 0},
+                "medium": {"type": "number", "minimum": 0},
+                "high": {"type": "number", "minimum": 0},
+                "critical": {"type": "number", "minimum": 0}
+            }
+        }
+    },
+    "required": ["agent"]
+}
 
 
 class VulnGuardOrchestrator:
@@ -103,17 +214,20 @@ class VulnGuardOrchestrator:
     
     def _load_config(self) -> Dict[str, Any]:
         """
-        Load agent configuration from YAML file.
+        Load agent configuration from YAML file with schema validation.
         
         Returns:
             Configuration dictionary
+            
+        Raises:
+            ValueError: If configuration validation fails
         """
         if not self.config_path.exists():
             # Return default configuration
-            return {
+            default_config = {
                 'agent': {
                     'name': 'VulnGuard',
-                    'version': '1.0.0',
+        "version": "1.1.0",
                     'mode': 'dry-run'
                 },
                 'logging': {
@@ -130,13 +244,36 @@ class VulnGuardOrchestrator:
                     'rollback_on_failure': True
                 }
             }
+            # Validate default config
+            try:
+                jsonschema.validate(instance=default_config, schema=CONFIG_SCHEMA)
+            except jsonschema.ValidationError as e:
+                raise ValueError(f"Default configuration validation failed: {e.message}")
+            return default_config
         
         try:
             with open(self.config_path, 'r') as f:
-                return yaml.safe_load(f)
+                config = yaml.safe_load(f)
+            
+            # Validate configuration against schema
+            try:
+                jsonschema.validate(instance=config, schema=CONFIG_SCHEMA)
+            except jsonschema.ValidationError as e:
+                error_msg = f"Configuration validation failed: {e.message}"
+                if e.path:
+                    error_msg += f" at path: {'.'.join(str(p) for p in e.path)}"
+                if e.validator_value:
+                    error_msg += f" (received: {e.validator_value})"
+                raise ValueError(error_msg)
+            
+            return config
+            
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            raise
         except Exception as e:
             print(f"Warning: Failed to load config: {e}", file=sys.stderr)
-            return {}
+            raise ValueError(f"Failed to load configuration: {e}")
     
     def _get_system_info(self) -> Dict[str, Any]:
         """
@@ -188,7 +325,14 @@ class VulnGuardOrchestrator:
         click.echo("Step 3: Getting AI advisories...")
         ai_advisories = []
         
-        for scan_result, eval_result in zip(scan_results, evaluation_results):
+        # Helper lookup
+        evaluation_lookup = {r.rule_id: r for r in evaluation_results}
+
+        for scan_result in scan_results:
+            eval_result = evaluation_lookup.get(scan_result.rule_id)
+            if not eval_result:
+                continue
+
             if eval_result.ai_assist_required:
                 # Load rule data for AI analysis
                 rule_data = self.scanner._load_rule(f"{scan_result.rule_id}.yaml")
@@ -300,11 +444,16 @@ class VulnGuardOrchestrator:
             lines.append("Detailed Results:")
             lines.append("-" * 60)
             
-            for scan_result, eval_result in zip(scan_results, evaluation_results):
+            evaluation_lookup = {r.rule_id: r for r in evaluation_results}
+            
+            for scan_result in scan_results:
+                eval_result = evaluation_lookup.get(scan_result.rule_id)
+                
                 lines.append(f"Rule: {scan_result.rule_id} ({scan_result.benchmark})")
                 lines.append(f"  Compliant: {scan_result.compliant}")
-                lines.append(f"  Severity: {eval_result.severity}")
-                lines.append(f"  Risk Level: {eval_result.risk_level}")
+                if eval_result:
+                    lines.append(f"  Severity: {eval_result.severity}")
+                    lines.append(f"  Risk Level: {eval_result.risk_level}")
                 lines.append(f"  Expected: {scan_result.expected_state}")
                 lines.append(f"  Actual: {scan_result.actual_state}")
                 if not scan_result.compliant:
@@ -316,7 +465,7 @@ class VulnGuardOrchestrator:
 
 # CLI Interface
 @click.group()
-@click.version_option(version='1.0.0', prog_name='VulnGuard')
+@click.version_option(version='1.1.0', prog_name='VulnGuard')
 def cli():
     """
     VulnGuard - Linux Security Compliance Agent
@@ -499,7 +648,7 @@ def version():
     """
     Display VulnGuard version information.
     """
-    click.echo("VulnGuard v1.0.0")
+    click.echo("VulnGuard v1.1.0")
     click.echo("Linux Security Compliance Agent")
     click.echo("")
     click.echo("Supported Benchmarks:")
@@ -509,7 +658,14 @@ def version():
 
 def main():
     """Main entry point for the CLI."""
-    cli()
+    try:
+        cli()
+    except VulnGuardException as e:
+        click.echo(f"Error: {str(e)}", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"Unexpected Error: {str(e)}", err=True)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

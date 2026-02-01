@@ -4,7 +4,7 @@ title: "The SSH daemon must not permit empty passwords."
 severity: critical
 original_severity: "CAT I"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Empty passwords allow authentication without any password, which is a significant security vulnerability."
 check:
   type: file

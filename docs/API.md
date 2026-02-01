@@ -10,6 +10,7 @@ This document provides detailed API documentation for the VulnGuard Linux Securi
 - [Advisor Module](#advisor-module)
 - [Remediation Module](#remediation-module)
 - [Logging Module](#logging-module)
+- [Security Module](#security-module)
 - [Main Orchestrator](#main-orchestrator)
 
 ---
@@ -926,6 +927,511 @@ def log_system_info(
 | `os_version` | `str` | Required | Operating system version |
 | `hostname` | `str` | Required | System hostname |
 | `additional_info` | `Optional[Dict[str, Any]]` | `None` | Additional system information |
+
+---
+
+## Security Module
+
+### SecureCommandExecutor
+
+Secure command executor that eliminates command injection vulnerabilities.
+
+```python
+class SecureCommandExecutor:
+    def __init__(
+        self,
+        logger: Optional[AuditLogger] = None,
+        command_allowlist: Optional[List[str]] = None,
+        command_blocklist: Optional[List[str]] = None,
+        timeout: int = 30,
+        max_output_size: int = 10485760
+    )
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `logger` | `Optional[AuditLogger]` | `None` | Optional audit logger instance |
+| `command_allowlist` | `Optional[List[str]]` | `None` | Optional custom command allow-list |
+| `command_blocklist` | `Optional[List[str]]` | `None` | Optional custom command block-list |
+| `timeout` | `int` | `30` | Default timeout for command execution in seconds |
+| `max_output_size` | `int` | `10485760` | Maximum size of stdout/stderr in bytes (10MB) |
+
+**Default Command Allow-List:**
+
+```python
+DEFAULT_COMMAND_ALLOWLIST = [
+    r'^systemctl$',
+    r'^sysctl$',
+    r'^chmod$',
+    r'^chown$',
+    r'^sed$',
+    r'^echo$',
+    r'^cat$',
+    r'^grep$',
+    r'^awk$',
+    r'^stat$',
+    r'^ls$',
+    r'^find$',
+    r'^test$',
+    r'\[',
+    r'^which$',
+    r'^id$',
+    r'^whoami$',
+    r'^hostname$',
+    r'^uname$',
+    r'^df$',
+    r'^du$',
+    r'^mount$',
+    r'^umount$',
+    r'^ps$',
+    r'^netstat$',
+    r'^ss$',
+    r'^ip$',
+    r'^getent$',
+    r'^pwd$'
+]
+```
+
+**Default Command Block-List:**
+
+```python
+COMMAND_BLOCKLIST = [
+    r'^rm\s+-rf\s*/',
+    r'^chmod\s+777',
+    r'^dd\s+',
+    r'^mkfs',
+    r'^fdisk',
+    r'^userdel',
+    r'^groupdel',
+    r'^passwd\s+-l\s+root',
+    r'^setenforce\s+0',
+    r'^iptables\s+-F',
+    r':(){:|:&};:',  # Shellshock
+    r'eval\s*\(',
+    r'exec\s*\(',
+    r'\$\(',
+    r'`[^`]*`',  # Backtick command substitution
+    r';\s*rm\s',
+    r'&&\s*rm\s',
+    r'\|\|\s*rm\s',
+    r'>\s*/dev/',
+    r'>>\s*/etc/',
+    r'nc\s+-l',  # Netcat listener
+    r'ncat\s+-l',
+    r'socat\s+TCP-LISTEN'
+]
+```
+
+**Methods:**
+
+#### SecureCommandExecutor.execute()
+
+Execute a command securely.
+
+```python
+def execute(
+    self,
+    command: List[str],
+    timeout: Optional[int] = None,
+    env: Optional[Dict[str, str]] = None,
+    cwd: Optional[str] = None,
+    dry_run: bool = False
+) -> Tuple[int, str, str]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `command` | `List[str]` | Required | Command as a list of arguments (NEVER use shell=True) |
+| `timeout` | `Optional[int]` | `None` | Optional timeout in seconds (overrides default) |
+| `env` | `Optional[Dict[str, str]]` | `None` | Optional environment variables dictionary |
+| `cwd` | `Optional[str]` | `None` | Optional working directory |
+| `dry_run` | `bool` | `False` | If True, only log without executing |
+
+**Returns:** Tuple of (exit_code, stdout, stderr)
+
+**Example:**
+```python
+executor = SecureCommandExecutor(logger=audit_logger)
+result = executor.execute(['systemctl', 'status', 'ssh'])
+exit_code, stdout, stderr = result
+```
+
+#### SecureCommandExecutor.execute_shell_command_safely()
+
+Execute a shell command safely by parsing it into arguments.
+
+```python
+def execute_shell_command_safely(
+    self,
+    shell_command: str,
+    timeout: Optional[int] = None,
+    dry_run: bool = False
+) -> Tuple[int, str, str]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `shell_command` | `str` | Required | Shell command string to parse and execute |
+| `timeout` | `Optional[int]` | `None` | Optional timeout in seconds |
+| `dry_run` | `bool` | `False` | If True, only log without executing |
+
+**Returns:** Tuple of (exit_code, stdout, stderr)
+
+**Example:**
+```python
+executor = SecureCommandExecutor(logger=audit_logger)
+exit_code, stdout, stderr = executor.execute_shell_command_safely('systemctl status ssh')
+```
+
+---
+
+### SecureFilePermissions
+
+Secure file and directory permission manager.
+
+```python
+class SecureFilePermissions:
+    def __init__(
+        self,
+        logger: Optional[AuditLogger] = None,
+        default_file_permissions: int = DEFAULT_FILE_PERMISSIONS,
+        default_dir_permissions: int = DEFAULT_DIR_PERMISSIONS,
+        enforce_on_create: bool = True
+    )
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `logger` | `Optional[AuditLogger]` | `None` | Optional audit logger instance |
+| `default_file_permissions` | `int` | `0o600` | Default permissions for files (octal) |
+| `default_dir_permissions` | `int` | `0o700` | Default permissions for directories (octal) |
+| `enforce_on_create` | `bool` | `True` | Whether to enforce permissions on file creation |
+
+**Default Permissions:**
+
+```python
+DEFAULT_FILE_PERMISSIONS = 0o600  # rw------- (owner read/write only)
+DEFAULT_DIR_PERMISSIONS = 0o700   # rwx------ (owner read/write/execute only)
+MAX_FILE_PERMISSIONS = 0o644  # rw-r--r-- (owner read/write, group/others read)
+MAX_DIR_PERMISSIONS = 0o755   # rwxr-xr-x (owner full, group/others read/execute)
+TEMP_FILE_PERMISSIONS = 0o600
+TEMP_DIR_PERMISSIONS = 0o700
+```
+
+**Methods:**
+
+#### SecureFilePermissions.get_file_permissions()
+
+Get the current permissions of a file.
+
+```python
+def get_file_permissions(self, file_path: str) -> int
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `file_path` | `str` | Path to the file |
+
+**Returns:** Permission mode (octal)
+
+#### SecureFilePermissions.set_file_permissions()
+
+Set permissions on a file or directory.
+
+```python
+def set_file_permissions(
+    self,
+    file_path: str,
+    permissions: int,
+    verify: bool = True
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file or directory |
+| `permissions` | `int` | Required | Permission mode (octal) |
+| `verify` | `bool` | `True` | Whether to verify permissions were set correctly |
+
+#### SecureFilePermissions.create_secure_file()
+
+Create a file with secure permissions.
+
+```python
+def create_secure_file(
+    self,
+    file_path: str,
+    content: Optional[str] = None,
+    permissions: Optional[int] = None,
+    encoding: str = 'utf-8'
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file to create |
+| `content` | `Optional[str]` | `None` | Optional content to write to the file |
+| `permissions` | `Optional[int]` | `None` | Optional custom permissions (uses default if not specified) |
+| `encoding` | `str` | `'utf-8'` | File encoding |
+
+**Example:**
+```python
+permissions = SecureFilePermissions(logger=audit_logger)
+permissions.create_secure_file('/path/to/file', content='data')
+```
+
+#### SecureFilePermissions.create_secure_directory()
+
+Create a directory with secure permissions.
+
+```python
+def create_secure_directory(
+    self,
+    dir_path: str,
+    permissions: Optional[int] = None,
+    parents: bool = True
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `dir_path` | `str` | Required | Path to the directory to create |
+| `permissions` | `Optional[int]` | `None` | Optional custom permissions (uses default if not specified) |
+| `parents` | `bool` | `True` | Whether to create parent directories |
+
+#### SecureFilePermissions.audit_directory_permissions()
+
+Audit permissions in a directory.
+
+```python
+def audit_directory_permissions(
+    self,
+    directory: str,
+    recursive: bool = True,
+    max_file_perms: int = MAX_FILE_PERMISSIONS,
+    max_dir_perms: int = MAX_DIR_PERMISSIONS
+) -> dict
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `directory` | `str` | Required | Directory to audit |
+| `recursive` | `bool` | `True` | Whether to audit recursively |
+| `max_file_perms` | `int` | `0o644` | Maximum allowed file permissions |
+| `max_dir_perms` | `int` | `0o755` | Maximum allowed directory permissions |
+
+**Returns:** Dictionary with audit results
+
+---
+
+### AtomicFileOperations
+
+Atomic file operations that eliminate TOCTOU vulnerabilities.
+
+```python
+class AtomicFileOperations:
+    def __init__(
+        self,
+        logger: Optional[AuditLogger] = None,
+        temp_dir: Optional[str] = None
+    )
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `logger` | `Optional[AuditLogger]` | `None` | Optional audit logger instance |
+| `temp_dir` | `Optional[str]` | `None` | Optional custom temporary directory |
+
+**Methods:**
+
+#### AtomicFileOperations.atomic_read()
+
+Atomically read a file.
+
+```python
+def atomic_read(
+    self,
+    file_path: str,
+    encoding: str = 'utf-8',
+    binary: bool = False
+) -> Union[str, bytes]
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file to read |
+| `encoding` | `str` | `'utf-8'` | File encoding (for text mode) |
+| `binary` | `bool` | `False` | Whether to read in binary mode |
+
+**Returns:** File content as string or bytes
+
+#### AtomicFileOperations.atomic_write()
+
+Atomically write content to a file.
+
+```python
+def atomic_write(
+    self,
+    file_path: str,
+    content: Union[str, bytes],
+    encoding: str = 'utf-8',
+    mode: str = 'wb',
+    permissions: int = 0o600,
+    backup: bool = False
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file to write |
+| `content` | `Union[str, bytes]` | Required | Content to write (string or bytes) |
+| `encoding` | `str` | `'utf-8'` | File encoding (for text mode) |
+| `mode` | `str` | `'wb'` | File mode ('wb' for binary, 'w' for text) |
+| `permissions` | `int` | `0o600` | File permissions (default: 0o600) |
+| `backup` | `bool` | `False` | Whether to create a backup of the original file |
+
+**Example:**
+```python
+ops = AtomicFileOperations(logger=audit_logger)
+ops.atomic_write('/path/to/file', content='data', permissions=0o600)
+```
+
+#### AtomicFileOperations.atomic_create()
+
+Atomically create a new file.
+
+```python
+def atomic_create(
+    self,
+    file_path: str,
+    content: Union[str, bytes],
+    encoding: str = 'utf-8',
+    permissions: int = 0o600
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file to create |
+| `content` | `Union[str, bytes]` | Required | Content to write (string or bytes) |
+| `encoding` | `str` | `'utf-8'` | File encoding (for text mode) |
+| `permissions` | `int` | `0o600` | File permissions (default: 0o600) |
+
+**Note:** Uses exclusive creation (mode='x') to prevent race conditions. If the file already exists, this will fail with FileExistsError.
+
+#### AtomicFileOperations.atomic_append()
+
+Atomically append content to a file.
+
+```python
+def atomic_append(
+    self,
+    file_path: str,
+    content: Union[str, bytes],
+    encoding: str = 'utf-8',
+    permissions: int = 0o600
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file to append to |
+| `content` | `Union[str, bytes]` | Required | Content to append (string or bytes) |
+| `encoding` | `str` | `'utf-8'` | File encoding (for text mode) |
+| `permissions` | `int` | `0o600` | File permissions (used if file doesn't exist) |
+
+**Note:** True atomic append is not possible on all filesystems. This method uses O_APPEND flag which provides atomicity for the append operation itself.
+
+#### AtomicFileOperations.atomic_replace()
+
+Atomically replace a file with another file.
+
+```python
+def atomic_replace(
+    self,
+    source_path: str,
+    target_path: str,
+    backup: bool = False
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `source_path` | `str` | Required | Path to the source file |
+| `target_path` | `str` | Required | Path to the target file (will be replaced) |
+| `backup` | `bool` | `False` | Whether to create a backup of the target file |
+
+**Note:** This is a true atomic operation using os.replace(). Either the replacement completes fully or not at all.
+
+#### AtomicFileOperations.atomic_copy()
+
+Atomically copy a file to a new location.
+
+```python
+def atomic_copy(
+    self,
+    source_path: str,
+    target_path: str,
+    permissions: int = 0o600
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `source_path` | `str` | Required | Path to the source file |
+| `target_path` | `str` | Required | Path to the target file |
+| `permissions` | `int` | `0o600` | Target file permissions (default: 0o600) |
+
+#### AtomicFileOperations.atomic_delete()
+
+Atomically delete a file.
+
+```python
+def atomic_delete(
+    self,
+    file_path: str,
+    backup: bool = False
+) -> None
+```
+
+**Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `file_path` | `str` | Required | Path to the file to delete |
+| `backup` | `bool` | `False` | Whether to create a backup before deletion |
 
 ---
 

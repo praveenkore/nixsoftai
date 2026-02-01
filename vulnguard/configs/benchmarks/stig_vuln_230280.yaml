@@ -4,7 +4,7 @@ title: "The SSH daemon must not permit host-based authentication."
 severity: medium
 original_severity: "CAT III"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Host-based authentication relies on potentially insecure trust relationships and should be disabled."
 check:
   type: file

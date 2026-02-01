@@ -7,6 +7,7 @@ This document provides detailed information about configuring the VulnGuard Linu
 - [Overview](#overview)
 - [Configuration File](#configuration-file)
 - [Configuration Sections](#configuration-sections)
+- [Security Module Configuration](#security-module-configuration-phase1)
 - [Benchmark Rules](#benchmark-rules)
 - [Environment Variables](#environment-variables)
 - [Best Practices](#best-practices)
@@ -546,6 +547,57 @@ output:
 - **`text`**: Plain text format (human-readable)
 
 **Recommendation:** Use `json` format for automated processing and `text` format for human review.
+
+---
+
+### Security Module Configuration (Phase 1)
+
+Controls Phase 1 security module behavior for command execution, file permissions, and atomic operations.
+
+```yaml
+security:
+  # Command Execution Security
+  command_timeout: 30              # Default timeout for command execution in seconds
+  max_output_size: 10485760        # Maximum size of stdout/stderr in bytes (10MB)
+  
+  # File Permission Security
+  default_file_permissions: 0o600   # Default permissions for files (rw-------)
+  default_dir_permissions: 0o700    # Default permissions for directories (rwx------)
+  max_file_permissions: 0o644        # Maximum allowed file permissions (rw-r--r--)
+  max_dir_permissions: 0o755         # Maximum allowed directory permissions (rwxr-xr-x)
+  enforce_on_create: true            # Enforce permissions on file creation
+  
+  # Atomic Operations
+  enable_atomic_operations: true     # Enable atomic file operations
+  temp_dir: null                   # Custom temporary directory (null = system default)
+```
+
+**Options:**
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `command_timeout` | integer | `30` | Default timeout for command execution in seconds |
+| `max_output_size` | integer | `10485760` | Maximum size of stdout/stderr in bytes (10MB) |
+| `default_file_permissions` | octal | `0o600` | Default permissions for files |
+| `default_dir_permissions` | octal | `0o700` | Default permissions for directories |
+| `max_file_permissions` | octal | `0o644` | Maximum allowed file permissions |
+| `max_dir_permissions` | octal | `0o755` | Maximum allowed directory permissions |
+| `enforce_on_create` | boolean | `true` | Enforce permissions on file creation |
+| `enable_atomic_operations` | boolean | `true` | Enable atomic file operations |
+| `temp_dir` | string | `null` | Custom temporary directory |
+
+**File Permission Values:**
+
+| Permission | Octal | Description |
+|-----------|---------|-------------|
+| 0o600 | `rw-------` | Owner read/write only (most secure) |
+| 0o640 | `rw-r-----` | Owner read/write, group read |
+| 0o644 | `rw-r--r--` | Owner read/write, group/others read |
+| 0o700 | `rwx------` | Owner read/write/execute only (most secure) |
+| 0o750 | `rwxr-x---` | Owner full, group read/execute |
+| 0o755 | `rwxr-xr-x` | Owner full, group/others read/execute |
+
+**Recommendation:** Keep `enforce_on_create` and `enable_atomic_operations` enabled for production environments to ensure security compliance.
 
 ---
 

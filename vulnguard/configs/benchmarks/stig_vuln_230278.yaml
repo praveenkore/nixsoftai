@@ -4,7 +4,7 @@ title: "The SSH daemon must limit the number of authentication attempts."
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "Limiting authentication attempts protects against brute force attacks by locking out attackers after multiple failed attempts."
 check:
   type: file

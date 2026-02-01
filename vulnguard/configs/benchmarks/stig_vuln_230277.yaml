@@ -4,7 +4,7 @@ title: "The SSH daemon must use protocol 2."
 severity: high
 original_severity: "CAT II"
 os_compatibility:
-  - ubuntu: "18.04+"
+  - ubuntu
 rationale: "SSH protocol 1 is deprecated and has known vulnerabilities. Protocol 2 provides stronger security features."
 check:
   type: file

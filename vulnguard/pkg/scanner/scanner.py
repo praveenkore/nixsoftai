@@ -27,7 +27,62 @@ import subprocess
 import yaml
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import jsonschema
 from vulnguard.pkg.logging.logger import AuditLogger
+
+# Rule Schema Definition
+RULE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "benchmark": {"type": "string"},
+        "title": {"type": "string"},
+        "rationale": {"type": "string"},
+        "severity": {"type": "string"},
+        "original_severity": {"type": "string"},
+        "os_compatibility": {"type": "array", "items": {"type": "string"}},
+        "check": {
+            "type": "object",
+            "properties": {
+                "type": {"type": "string", "enum": ["command", "file", "service", "sysctl"]},
+                "command": {"type": "string"},
+                "expected_state": {"type": "string"},
+                "path": {"type": "string"},
+                "expected_content": {"type": "string"},
+                "expected_permissions": {"type": "string"},
+                "expected_owner": {"type": "string"},
+                "service_name": {"type": "string"},
+                "key": {"type": "string"},
+                "expected_value": {"type": "string"}
+            },
+            "required": ["type"]
+        },
+        "remediation": {
+            "type": "object",
+            "properties": {
+                "commands": {"type": "array", "items": {"type": "string"}}
+            }
+        },
+        "rollback": {
+            "type": "object",
+            "properties": {
+                "commands": {"type": "array", "items": {"type": "string"}}
+            }
+        },
+        "ai_assist": {"type": "boolean"},
+        "approval_required": {"type": "boolean"},
+        "exception_allowed": {"type": "boolean"}
+    },
+    "required": [
+        "id", "benchmark", "title", "rationale", "severity", 
+        "check", "remediation", "rollback"
+    ]
+}
+
+# Lazy import to avoid circular dependency
+def _get_secure_command_executor():
+    from vulnguard.pkg.security.command_executor import SecureCommandExecutor
+    return SecureCommandExecutor
 
 
 class ScanResult:
@@ -89,7 +144,8 @@ class Scanner:
     def __init__(
         self,
         benchmark_dir: str = "vulnguard/configs/benchmarks",
-        logger: Optional[AuditLogger] = None
+        logger: Optional[AuditLogger] = None,
+        max_workers: int = 4
     ):
         """
         Initialize the scanner.
@@ -97,14 +153,19 @@ class Scanner:
         Args:
             benchmark_dir: Directory containing benchmark rule files
             logger: Optional audit logger instance
+            max_workers: Maximum number of threads for parallel scanning
         """
         self.benchmark_dir = Path(benchmark_dir)
         self.logger = logger or AuditLogger()
+        self.max_workers = max_workers
         self._rules_cache: Dict[str, Dict[str, Any]] = {}
+        # Initialize secure command executor using lazy import
+        executor_cls = _get_secure_command_executor()
+        self.command_executor = executor_cls(logger=self.logger)
     
     def _load_rule(self, rule_file: str) -> Optional[Dict[str, Any]]:
         """
-        Load a benchmark rule from YAML file.
+        Load a benchmark rule from YAML file with caching.
         
         Args:
             rule_file: Path to the rule YAML file
@@ -112,6 +173,10 @@ class Scanner:
         Returns:
             Dictionary containing the rule data, or None if loading fails
         """
+        # Check cache first
+        if rule_file in self._rules_cache:
+            return self._rules_cache[rule_file]
+            
         rule_path = self.benchmark_dir / rule_file
         
         if not rule_path.exists():
@@ -126,27 +191,24 @@ class Scanner:
             with open(rule_path, 'r') as f:
                 rule = yaml.safe_load(f)
             
-            # Validate required fields
-            required_fields = [
-                'benchmark', 'id', 'title', 'rationale',
-                'severity', 'original_severity', 'os_compatibility',
-                'check', 'remediation', 'rollback'
-            ]
-            
-            for field in required_fields:
-                if field not in rule:
-                    self.logger.log_error(
-                        "rule_validation",
-                        f"Missing required field: {field}",
-                        {"rule_file": rule_file, "rule": rule}
-                    )
-                    return None
+            # Validate against schema
+            try:
+                jsonschema.validate(instance=rule, schema=RULE_SCHEMA)
+            except jsonschema.ValidationError as e:
+                self.logger.log_error(
+                    "rule_validation",
+                    f"Rule schema validation failed: {str(e)}",
+                    {"rule_file": rule_file, "path": list(e.path)}
+                )
+                return None
             
             # Set defaults for optional fields
             rule.setdefault('ai_assist', False)
             rule.setdefault('approval_required', False)
             rule.setdefault('exception_allowed', False)
             
+            # Cache the successfully loaded rule
+            self._rules_cache[rule_file] = rule
             return rule
             
         except yaml.YAMLError as e:
@@ -163,10 +225,70 @@ class Scanner:
                 {"rule_file": rule_file}
             )
             return None
+
+    # ... (skipping unchanged methods) ...
+
+    def scan_all(self, rule_ids: Optional[List[str]] = None) -> List[ScanResult]:
+        """
+        Scan multiple benchmark rules in parallel.
+        
+        Args:
+            rule_ids: Optional list of rule IDs to scan. If None, scans all rules.
+            
+        Returns:
+            List of ScanResult objects
+        """
+        target_rule_ids = []
+        
+        if rule_ids:
+            target_rule_ids = rule_ids
+        else:
+            # Find all rules
+            for ext in ['*.yaml', '*.yml']:
+                for rule_file in self.benchmark_dir.glob(ext):
+                    target_rule_ids.append(rule_file.stem)
+        
+        if not target_rule_ids:
+            return []
+            
+        # Deduplicate ids
+        target_rule_ids = list(set(target_rule_ids))
+        
+        results = []
+        import concurrent.futures
+        
+        # Use ThreadPoolExecutor for parallel scanning
+        # Most checks are I/O bound (subprocess calls), so threads are efficient
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            future_to_rule = {
+                executor.submit(self.scan_rule, rule_id): rule_id 
+                for rule_id in target_rule_ids
+            }
+            
+            for future in concurrent.futures.as_completed(future_to_rule):
+                rule_id = future_to_rule[future]
+                try:
+                    result = future.result()
+                    if result:
+                        results.append(result)
+                except Exception as e:
+                    self.logger.log_error(
+                        "scan_parallel",
+                        f"Unhandled exception scanning rule {rule_id}: {str(e)}",
+                        {"rule_id": rule_id}
+                    )
+        
+        # Sort results by rule ID for deterministic output order
+        results.sort(key=lambda x: x.rule_id)
+        
+        return results
     
     def _execute_command(self, command: str) -> Tuple[int, str, str]:
         """
         Execute a shell command and return the result.
+        
+        Uses SecureCommandExecutor to eliminate command injection vulnerabilities.
+        The command string is parsed into arguments and executed without shell=True.
         
         Args:
             command: Command to execute
@@ -175,17 +297,15 @@ class Scanner:
             Tuple of (exit_code, stdout, stderr)
         """
         try:
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            return result.returncode, result.stdout, result.stderr
-        except subprocess.TimeoutExpired:
-            return -1, "", "Command timed out"
+            # Use secure command executor to parse and execute command
+            # This eliminates command injection vulnerabilities
+            return self.command_executor.execute_shell_command_safely(command, timeout=30)
         except Exception as e:
+            self.logger.log_error(
+                "command_execution",
+                f"Failed to execute command: {str(e)}",
+                {"command": command}
+            )
             return -1, "", str(e)
     
     def _check_command(
@@ -531,36 +651,4 @@ class Scanner:
                 error=str(e)
             )
     
-    def scan_all(self, rule_ids: Optional[List[str]] = None) -> List[ScanResult]:
-        """
-        Scan multiple benchmark rules.
-        
-        Args:
-            rule_ids: Optional list of rule IDs to scan. If None, scans all rules.
-            
-        Returns:
-            List of ScanResult objects
-        """
-        results = []
-        
-        if rule_ids:
-            # Scan specified rules
-            for rule_id in rule_ids:
-                result = self.scan_rule(rule_id)
-                if result:
-                    results.append(result)
-        else:
-            # Scan all rules in benchmark directory
-            for rule_file in self.benchmark_dir.glob('*.yaml'):
-                rule_id = rule_file.stem
-                result = self.scan_rule(rule_id)
-                if result:
-                    results.append(result)
-            
-            for rule_file in self.benchmark_dir.glob('*.yml'):
-                rule_id = rule_file.stem
-                result = self.scan_rule(rule_id)
-                if result:
-                    results.append(result)
-        
-        return results
+
