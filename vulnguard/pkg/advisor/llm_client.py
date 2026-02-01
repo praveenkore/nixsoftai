@@ -19,13 +19,218 @@ LLM Client Module - Multi-Provider LLM Integration
 
 Provides a unified interface for connecting to various LLM providers
 including OpenAI, Anthropic, OpenRouter, Ollama, and local models.
+
+Features:
+- Retry logic with exponential backoff for network operations
+- Connection pooling for efficient HTTP requests
+- Rate limiting to prevent API quota exhaustion
+- Comprehensive error handling and logging
 """
 
 import json
 import os
+import time
+import threading
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from functools import wraps
+from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import TYPE_CHECKING
 from vulnguard.pkg.logging.logger import AuditLogger
+
+import httpx
+
+# TYPE_CHECKING constant for optional imports
+if TYPE_CHECKING:
+    import torch  # type: ignore[import-untyped]
+    from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
+
+# Global HTTP client pool for connection pooling
+_http_client_pool: Dict[str, Any] = {}
+_http_client_lock = threading.Lock()
+
+
+class RateLimiter:
+    """
+    Rate limiter for API calls using token bucket algorithm.
+    
+    Prevents API quota exhaustion by limiting the rate of requests.
+    """
+    
+    def __init__(self, max_requests: int = 60, time_window: int = 60):
+        """
+        Initialize rate limiter.
+        
+        Args:
+            max_requests: Maximum number of requests allowed in time window
+            time_window: Time window in seconds
+        """
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = []
+        self.lock = threading.Lock()
+    
+    def acquire(self) -> bool:
+        """
+        Attempt to acquire a request token.
+        
+        Returns:
+            True if request is allowed, False if rate limit exceeded
+        """
+        with self.lock:
+            current_time = time.time()
+            
+            # Remove requests outside the time window
+            self.requests = [
+                req_time for req_time in self.requests
+                if current_time - req_time < self.time_window
+            ]
+            
+            # Check if we can make a request
+            if len(self.requests) < self.max_requests:
+                self.requests.append(current_time)
+                return True
+            
+            return False
+    
+    def wait_time(self) -> float:
+        """
+        Calculate time to wait before next request.
+        
+        Returns:
+            Time in seconds to wait
+        """
+        with self.lock:
+            if not self.requests:
+                return 0.0
+            
+            current_time = time.time()
+            oldest_request = min(self.requests)
+            
+            # Calculate when the oldest request will be outside the window
+            wait_time = (oldest_request + self.time_window) - current_time
+            
+            return max(0.0, wait_time)
+
+
+def retry_with_exponential_backoff(
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    backoff_factor: float = 2.0,
+    retry_on: Optional[Tuple[Type[Exception], ...]] = None,
+):
+    """
+    Decorator for retrying function calls with exponential backoff.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay in seconds
+        max_delay: Maximum delay in seconds
+        backoff_factor: Multiplier for delay after each retry
+        retry_on: Tuple of exception types to retry on (defaults to network-related exceptions)
+    """
+    # Default to network-related exceptions for LLM API calls
+    if retry_on is None:
+        retry_on = (
+            httpx.RequestError,
+            httpx.TimeoutException,
+            ConnectionError,
+            json.JSONDecodeError,
+        )
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except retry_on as e:
+                    last_exception = e
+                    
+                    if attempt < max_retries:
+                        # Calculate delay with exponential backoff
+                        delay = min(base_delay * (backoff_factor ** attempt), max_delay)
+                        
+                        # Extract logger from args if available
+                        logger = None
+                        if args and hasattr(args[0], 'logger'):
+                            logger = args[0].logger
+                        
+                        if logger:
+                            logger.log_warning(
+                                f"Request failed (attempt {attempt + 1}/{max_retries + 1}): {str(e)}. "
+                                f"Retrying in {delay:.2f} seconds..."
+                            )
+                        
+                        time.sleep(delay)
+                    else:
+                        # All retries exhausted
+                        if logger:
+                            logger.log_error(
+                                "llm_client",
+                                f"Request failed after {max_retries} retries: {str(e)}"
+                            )
+                        raise
+            
+            # This should never be reached, but just in case
+            raise last_exception
+        
+        return wrapper
+    return decorator
+
+
+def get_shared_http_client(
+    endpoint: str,
+    timeout: int = 30,
+    limits: Optional[Dict[str, int]] = None
+) -> Any:
+    """
+    Get or create a shared HTTP client for connection pooling.
+    
+    Args:
+        endpoint: API endpoint URL (used as key for client pool)
+        timeout: Request timeout in seconds
+        limits: Optional connection limits (max_connections, max_keepalive_connections)
+        
+    Returns:
+        Shared httpx.Client instance
+    """
+    import httpx
+    
+    # Normalize endpoint for use as key
+    endpoint_key = endpoint.rstrip('/')
+    
+    with _http_client_lock:
+        if endpoint_key not in _http_client_pool:
+            # Configure connection limits
+            limits = limits or {
+                'max_connections': 100,
+                'max_keepalive_connections': 20
+            }
+            
+            # Create new HTTP client with connection pooling
+            _http_client_pool[endpoint_key] = httpx.Client(
+                timeout=timeout,
+                limits=httpx.Limits(**limits)
+            )
+        
+        return _http_client_pool[endpoint_key]
+
+
+def close_http_clients():
+    """
+    Close all shared HTTP clients.
+    
+    Should be called when shutting down the application.
+    """
+    with _http_client_lock:
+        for client in _http_client_pool.values():
+            try:
+                client.close()
+            except Exception:
+                pass
+        _http_client_pool.clear()
 
 
 class BaseLLMClient(ABC):
@@ -41,7 +246,9 @@ class BaseLLMClient(ABC):
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize LLM client.
@@ -51,11 +258,27 @@ class BaseLLMClient(ABC):
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature (0.0 - 1.0)
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts for failed requests
+            rate_limit: Optional rate limit (requests per minute)
         """
         self.logger = logger or AuditLogger()
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.timeout = timeout
+        self.max_retries = max_retries
+        
+        # Initialize rate limiter if rate_limit is specified
+        self.rate_limiter = RateLimiter(max_requests=rate_limit, time_window=60) if rate_limit else None
+    
+    def _wait_for_rate_limit(self):
+        """
+        Wait if rate limit would be exceeded.
+        """
+        if self.rate_limiter:
+            wait_time = self.rate_limiter.wait_time()
+            if wait_time > 0:
+                self.logger.log_info(f"Rate limit reached, waiting {wait_time:.2f} seconds...")
+                time.sleep(wait_time)
     
     @abstractmethod
     def generate_response(
@@ -96,6 +319,11 @@ class OpenRouterClient(BaseLLMClient):
     - Google (Gemini models)
     - Meta (Llama models)
     - And many more
+    
+    Features:
+    - Retry logic with exponential backoff
+    - Connection pooling for efficiency
+    - Rate limiting to prevent quota exhaustion
     """
     
     def __init__(
@@ -107,7 +335,9 @@ class OpenRouterClient(BaseLLMClient):
         max_tokens: int = 2000,
         temperature: float = 0.3,
         timeout: int = 30,
-        site_url: str = "https://openrouter.ai"
+        site_url: str = "https://openrouter.ai",
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize the OpenRouter client.
@@ -121,16 +351,55 @@ class OpenRouterClient(BaseLLMClient):
             temperature: Sampling temperature
             timeout: Request timeout in seconds
             site_url: OpenRouter site URL for headers
+            max_retries: Maximum number of retry attempts
+            rate_limit: Optional rate limit (requests per minute)
         """
-        super().__init__(logger, max_tokens, temperature, timeout)
+        super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.api_key = api_key
         self.model = model
         self.api_endpoint = api_endpoint
         self.site_url = site_url
         
-        # Import httpx for HTTP requests
-        import httpx
-        self.http_client = httpx.Client(timeout=timeout)
+        # Use shared HTTP client for connection pooling
+        self.http_client = get_shared_http_client(api_endpoint, timeout)
+    
+    def _make_request(
+        self,
+        headers: Dict[str, str],
+        payload: Dict[str, Any]
+    ) -> str:
+        """
+        Make HTTP request with retry logic.
+        
+        Args:
+            headers: HTTP headers
+            payload: Request payload
+            
+        Returns:
+            Response content as string
+        """
+        # Wait for rate limit if needed
+        self._wait_for_rate_limit()
+        
+        # Make request with retry logic
+        @retry_with_exponential_backoff(
+            max_retries=self.max_retries,
+            base_delay=1.0,
+            max_delay=60.0,
+            backoff_factor=2.0,
+            retry_on=(Exception,)
+        )
+        def _request():
+            response = self.http_client.post(
+                self.api_endpoint,
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+        
+        return _request()
     
     def generate_response(
         self,
@@ -169,16 +438,7 @@ class OpenRouterClient(BaseLLMClient):
         }
         
         try:
-            response = self.http_client.post(
-                self.api_endpoint,
-                headers=headers,
-                json=payload
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
-            
+            return self._make_request(headers, payload)
         except Exception as e:
             self.logger.log_error(
                 "llm_client",
@@ -195,6 +455,11 @@ class OpenRouterClient(BaseLLMClient):
 class OpenAIClient(BaseLLMClient):
     """
     OpenAI API client for GPT models.
+    
+    Features:
+    - Retry logic with exponential backoff
+    - Connection pooling for efficiency
+    - Rate limiting to prevent quota exhaustion
     """
     
     def __init__(
@@ -205,7 +470,9 @@ class OpenAIClient(BaseLLMClient):
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize the OpenAI client.
@@ -218,15 +485,54 @@ class OpenAIClient(BaseLLMClient):
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            rate_limit: Optional rate limit (requests per minute)
         """
-        super().__init__(logger, max_tokens, temperature, timeout)
+        super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.api_key = api_key
         self.model = model
         self.api_endpoint = api_endpoint
         
-        # Import httpx for HTTP requests
-        import httpx
-        self.http_client = httpx.Client(timeout=timeout)
+        # Use shared HTTP client for connection pooling
+        self.http_client = get_shared_http_client(api_endpoint, timeout)
+    
+    def _make_request(
+        self,
+        headers: Dict[str, str],
+        payload: Dict[str, Any]
+    ) -> str:
+        """
+        Make HTTP request with retry logic.
+        
+        Args:
+            headers: HTTP headers
+            payload: Request payload
+            
+        Returns:
+            Response content as string
+        """
+        # Wait for rate limit if needed
+        self._wait_for_rate_limit()
+        
+        # Make request with retry logic
+        @retry_with_exponential_backoff(
+            max_retries=self.max_retries,
+            base_delay=1.0,
+            max_delay=60.0,
+            backoff_factor=2.0,
+            retry_on=(Exception,)
+        )
+        def _request():
+            response = self.http_client.post(
+                self.api_endpoint,
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+        
+        return _request()
     
     def generate_response(
         self,
@@ -263,16 +569,7 @@ class OpenAIClient(BaseLLMClient):
         }
         
         try:
-            response = self.http_client.post(
-                self.api_endpoint,
-                headers=headers,
-                json=payload
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
-            
+            return self._make_request(headers, payload)
         except Exception as e:
             self.logger.log_error(
                 "llm_client",
@@ -289,6 +586,11 @@ class OpenAIClient(BaseLLMClient):
 class AnthropicClient(BaseLLMClient):
     """
     Anthropic API client for Claude models.
+    
+    Features:
+    - Retry logic with exponential backoff
+    - Connection pooling for efficiency
+    - Rate limiting to prevent quota exhaustion
     """
     
     def __init__(
@@ -299,7 +601,9 @@ class AnthropicClient(BaseLLMClient):
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize the Anthropic client.
@@ -312,15 +616,54 @@ class AnthropicClient(BaseLLMClient):
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            rate_limit: Optional rate limit (requests per minute)
         """
-        super().__init__(logger, max_tokens, temperature, timeout)
+        super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.api_key = api_key
         self.model = model
         self.api_endpoint = api_endpoint
         
-        # Import httpx for HTTP requests
-        import httpx
-        self.http_client = httpx.Client(timeout=timeout)
+        # Use shared HTTP client for connection pooling
+        self.http_client = get_shared_http_client(api_endpoint, timeout)
+    
+    def _make_request(
+        self,
+        headers: Dict[str, str],
+        payload: Dict[str, Any]
+    ) -> str:
+        """
+        Make HTTP request with retry logic.
+        
+        Args:
+            headers: HTTP headers
+            payload: Request payload
+            
+        Returns:
+            Response content as string
+        """
+        # Wait for rate limit if needed
+        self._wait_for_rate_limit()
+        
+        # Make request with retry logic
+        @retry_with_exponential_backoff(
+            max_retries=self.max_retries,
+            base_delay=1.0,
+            max_delay=60.0,
+            backoff_factor=2.0,
+            retry_on=(Exception,)
+        )
+        def _request():
+            response = self.http_client.post(
+                self.api_endpoint,
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["content"][0]["text"]
+        
+        return _request()
     
     def generate_response(
         self,
@@ -354,16 +697,7 @@ class AnthropicClient(BaseLLMClient):
             payload["system"] = system_prompt
         
         try:
-            response = self.http_client.post(
-                self.api_endpoint,
-                headers=headers,
-                json=payload
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            return data["content"][0]["text"]
-            
+            return self._make_request(headers, payload)
         except Exception as e:
             self.logger.log_error(
                 "llm_client",
@@ -382,6 +716,11 @@ class OllamaClient(BaseLLMClient):
     Ollama API client for local LLM inference.
     
     Ollama provides a local API for running models like LLaMA, Mistral, etc.
+    
+    Features:
+    - Retry logic with exponential backoff
+    - Connection pooling for efficiency
+    - Rate limiting to prevent quota exhaustion
     """
     
     def __init__(
@@ -391,7 +730,9 @@ class OllamaClient(BaseLLMClient):
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize the Ollama client.
@@ -403,14 +744,50 @@ class OllamaClient(BaseLLMClient):
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            rate_limit: Optional rate limit (requests per minute)
         """
-        super().__init__(logger, max_tokens, temperature, timeout)
+        super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.api_endpoint = api_endpoint
         self.model = model
         
-        # Import httpx for HTTP requests
-        import httpx
-        self.http_client = httpx.Client(timeout=timeout)
+        # Use shared HTTP client for connection pooling
+        self.http_client = get_shared_http_client(api_endpoint, timeout)
+    
+    def _make_request(
+        self,
+        payload: Dict[str, Any]
+    ) -> str:
+        """
+        Make HTTP request with retry logic.
+        
+        Args:
+            payload: Request payload
+            
+        Returns:
+            Response content as string
+        """
+        # Wait for rate limit if needed
+        self._wait_for_rate_limit()
+        
+        # Make request with retry logic
+        @retry_with_exponential_backoff(
+            max_retries=self.max_retries,
+            base_delay=1.0,
+            max_delay=60.0,
+            backoff_factor=2.0,
+            retry_on=(Exception,)
+        )
+        def _request():
+            response = self.http_client.post(
+                self.api_endpoint,
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["response"]
+        
+        return _request()
     
     def generate_response(
         self,
@@ -446,15 +823,7 @@ class OllamaClient(BaseLLMClient):
         }
         
         try:
-            response = self.http_client.post(
-                self.api_endpoint,
-                json=payload
-            )
-            response.raise_for_status()
-            
-            data = response.json()
-            return data["response"]
-            
+            return self._make_request(payload)
         except Exception as e:
             self.logger.log_error(
                 "llm_client",
@@ -483,7 +852,9 @@ class LocalLLMClient(BaseLLMClient):
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize the local LLM client.
@@ -496,8 +867,10 @@ class LocalLLMClient(BaseLLMClient):
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            rate_limit: Optional rate limit (requests per minute)
         """
-        super().__init__(logger, max_tokens, temperature, timeout)
+        super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.model_path = model_path
         self.model_type = model_type
         self.device = device
@@ -512,8 +885,8 @@ class LocalLLMClient(BaseLLMClient):
         Note: This requires transformers and torch to be installed.
         """
         try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
+            import torch  # type: ignore[import-untyped]
             
             # Determine device
             if self.device == "auto":
@@ -636,7 +1009,9 @@ class MockLLMClient(BaseLLMClient):
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
-        timeout: int = 30
+        timeout: int = 30,
+        max_retries: int = 3,
+        rate_limit: Optional[int] = None
     ):
         """
         Initialize the mock LLM client.
@@ -646,8 +1021,10 @@ class MockLLMClient(BaseLLMClient):
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
             timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            rate_limit: Optional rate limit (requests per minute)
         """
-        super().__init__(logger, max_tokens, temperature, timeout)
+        super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
     
     def generate_response(
         self,
@@ -706,6 +1083,10 @@ def create_llm_client(
     """
     provider_lower = provider.lower()
     
+    # Common parameters for all clients
+    max_retries = config.get("max_retries", 3)
+    rate_limit = config.get("rate_limit")
+    
     if provider_lower == "openrouter":
         api_key = config.get("api_key", "")
         if not api_key or api_key.startswith("${"):
@@ -727,7 +1108,9 @@ def create_llm_client(
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
             timeout=config.get("timeout", 30),
-            site_url=config.get("site_url", "https://openrouter.ai")
+            site_url=config.get("site_url", "https://openrouter.ai"),
+            max_retries=max_retries,
+            rate_limit=rate_limit
         )
     
     elif provider_lower == "openai":
@@ -750,7 +1133,9 @@ def create_llm_client(
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
-            timeout=config.get("timeout", 30)
+            timeout=config.get("timeout", 30),
+            max_retries=max_retries,
+            rate_limit=rate_limit
         )
     
     elif provider_lower == "anthropic":
@@ -773,7 +1158,9 @@ def create_llm_client(
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
-            timeout=config.get("timeout", 30)
+            timeout=config.get("timeout", 30),
+            max_retries=max_retries,
+            rate_limit=rate_limit
         )
     
     elif provider_lower == "ollama":
@@ -783,7 +1170,9 @@ def create_llm_client(
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
-            timeout=config.get("timeout", 30)
+            timeout=config.get("timeout", 30),
+            max_retries=max_retries,
+            rate_limit=rate_limit
         )
     
     elif provider_lower == "local":
@@ -798,7 +1187,9 @@ def create_llm_client(
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
-            timeout=config.get("timeout", 30)
+            timeout=config.get("timeout", 30),
+            max_retries=max_retries,
+            rate_limit=rate_limit
         )
     
     elif provider_lower == "mock":
@@ -806,7 +1197,9 @@ def create_llm_client(
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
-            timeout=config.get("timeout", 30)
+            timeout=config.get("timeout", 30),
+            max_retries=max_retries,
+            rate_limit=rate_limit
         )
     
     else:

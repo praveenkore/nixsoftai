@@ -22,7 +22,8 @@ openai>=1.0.0
 anthropic>=0.18.0
 httpx>=0.25.0
 
-# LLM Integration - Local Models
+# LLM Integration - Local Models (optional)
+# Uncomment these lines if you want to use local models:
 # transformers>=4.35.0
 # accelerate>=0.25.0
 # torch>=2.1.0
