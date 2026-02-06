@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269214"
+title: "Executable search paths within the initialization files of all local interactive AlmaLinux OS 9 users must only contain paths that resolve to the system default or the users home directory."
+stig_id: "ALMA-09-015200"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00230
+vulnerability_id: "V-269214"
+
+rationale: |
+  The executable search path (typically the $PATH environment variable) contains a list of directories for the shell to search to find executables. If this path includes the current working directory, executables in these directories may be executed instead of system commands.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        grep -i "path=" /home/*/.* 2>/dev/null | grep -vE '(:|\")\$HOME|(:|\")~' | grep -vE '^\/home\/[^/]+\/\..*:PATH='
+        if [ $? -eq 0 ]; then
+             exit 1 # grep found suspicious paths
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify user initialization files do not contain unsafe PATH entries"
+    remediation:
+      commands:
+        - "# Manual remediation required: Edit user initialization files to remove unsafe PATH entries."
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation required"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

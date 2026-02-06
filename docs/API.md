@@ -31,7 +31,8 @@ class ScanResult:
         expected_state: str,
         actual_state: str,
         check_output: str,
-        error: Optional[str] = None
+        error: Optional[str] = None,
+        status: str = "checked"
     )
 ```
 
@@ -46,6 +47,56 @@ class ScanResult:
 | `actual_state` | `str` | Actual state found during the scan |
 | `check_output` | `str` | Output from the check command |
 | `error` | `Optional[str]` | Optional error message if scan failed |
+| `status` | `str` | Execution status. Valid values: "checked", "skipped_os", "skipped_manual", "not_applicable" |
+
+**Status Values:**
+
+| Status | Description | Example |
+|--------|-------------|---------|
+| `checked` | Rule was executed (compliant or not compliant) | Normal scan result |
+| `skipped_os` | Rule skipped due to OS incompatibility | Ubuntu rule on RHEL |
+| `skipped_manual` | Rule manually disabled in configuration | Rule excluded by admin |
+| `not_applicable` | Rule not applicable for other reasons | Platform-specific check |
+
+**Example - Compliant Rule:**
+```python
+result = ScanResult(
+    rule_id="cis_1_1_1",
+    benchmark="CIS",
+    compliant=True,
+    expected_state="not found",
+    actual_state="not found",
+    check_output="install cramfs /bin/true",
+    status="checked"
+)
+```
+
+**Example - Non-Compliant Rule:**
+```python
+result = ScanResult(
+    rule_id="cis_1_1_1",
+    benchmark="CIS",
+    compliant=False,
+    expected_state="not found",
+    actual_state="found",
+    check_output="modprobe: FATAL: Module cramfs not found",
+    status="checked"
+)
+```
+
+**Example - Skipped Rule (OS Incompatible):**
+```python
+result = ScanResult(
+    rule_id="cis_1_1_1",
+    benchmark="CIS",
+    compliant=False,
+    expected_state="not found",
+    actual_state="N/A",
+    check_output="Rule not applicable for AlmaLinux",
+    error=None,
+    status="skipped_os"
+)
+```
 
 **Methods:**
 
@@ -91,7 +142,8 @@ class EvaluationResult:
         risk_level: str,
         ai_assist_required: bool,
         approval_required: bool,
-        exception_allowed: bool
+        exception_allowed: bool,
+        status: str = "evaluated"
     )
 ```
 
@@ -101,12 +153,50 @@ class EvaluationResult:
 |-----------|------|-------------|
 | `rule_id` | `str` | Rule identifier |
 | `benchmark` | `str` | Benchmark type (CIS or STIG) |
-| `compliant` | `bool` | Whether the system is compliant |
+| `compliant` | `bool` | Whether the system is compliant (None if not applicable) |
 | `severity` | `str` | Normalized severity level (critical, high, medium, low) |
 | `risk_level` | `str` | Risk level (critical, high, medium, low) |
 | `ai_assist_required` | `bool` | Whether AI assistance is required |
 | `approval_required` | `bool` | Whether approval is required for remediation |
 | `exception_allowed` | `bool` | Whether exception is allowed for this rule |
+| `status` | `str` | Evaluation status. Valid values: "evaluated", "not_applicable" |
+
+**Status Values:**
+
+| Status | Description | compliant Value |
+|--------|-------------|----------------|
+| `evaluated` | Rule was evaluated (risk level determined) | True or False |
+| `not_applicable` | Rule not applicable (OS incompatible or other reason) | None |
+
+**Example - Evaluated Rule:**
+```python
+result = EvaluationResult(
+    rule_id="cis_1_1_1",
+    benchmark="CIS",
+    compliant=False,
+    severity="medium",
+    risk_level="medium",
+    ai_assist_required=False,
+    approval_required=False,
+    exception_allowed=True,
+    status="evaluated"
+)
+```
+
+**Example - Not Applicable Rule:**
+```python
+result = EvaluationResult(
+    rule_id="cis_1_1_1",
+    benchmark="CIS",
+    compliant=None,  # None for not applicable rules
+    severity="medium",
+    risk_level="low",  # Low risk for not applicable rules
+    ai_assist_required=False,
+    approval_required=False,
+    exception_allowed=False,
+    status="not_applicable"
+)
+```
 
 **Methods:**
 

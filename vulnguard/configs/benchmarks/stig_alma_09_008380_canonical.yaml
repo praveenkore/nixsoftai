@@ -1,0 +1,35 @@
+benchmark: STIG
+id: "V-269155"
+title: "AlmaLinux OS 9 must configure the appropriate SELinux context on the nondefault faillock tally directory."
+stig_id: "ALMA-09-008380"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002238
+srg: SRG-OS-000329-GPOS-00128
+
+rationale: |
+  If the faillock directory has an incorrect SELinux context, the pam module may not be able to write to it,
+  or unauthorized processes might tamper with it. The context must be 'faillog_t'.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["ls", "-Zd", "/var/log/faillock"]
+      expected_state: "contains"
+      expected_value: "faillog_t"
+      description: "Verify /var/log/faillock has faillog_t context"
+    remediation:
+      commands:
+        - "mkdir -p /var/log/faillock"
+        - "semanage fcontext -a -t faillog_t \"/var/log/faillock(/.*)?\""
+        - "restorecon -RFv /var/log/faillock"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set SELinux context for faillock directory"
+    rollback:
+      commands:
+        - "semanage fcontext -d -t faillog_t \"/var/log/faillock(/.*)?\""
+        - "restorecon -RFv /var/log/faillock"
+      description: "Remove SELinux context rule"

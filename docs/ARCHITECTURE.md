@@ -191,11 +191,16 @@ VulnGuard follows a layered architecture pattern:
 - Execute defined check commands
 - Validate results against expected states
 - Determine compliance status
-- OS compatibility checking
+- OS compatibility checking with family-based support
 
 **Key Classes**:
 - [`Scanner`](vulnguard/pkg/scanner/scanner.py:65): Main scanner class
 - [`ScanResult`](vulnguard/pkg/scanner/scanner.py:17): Scan result data structure
+
+**Key Functions**:
+- [`_parse_os_release()`](vulnguard/pkg/scanner/scanner.py:92): Parse /etc/os-release for ID and ID_LIKE fields
+- [`_get_os_family()`](vulnguard/pkg/scanner/scanner.py:143): Map detected OS to OS family using OS_FAMILY_MAP
+- [`_is_os_compatible()`](vulnguard/pkg/scanner/scanner.py:176): Check OS compatibility with family-based matching
 
 **Supported Check Types**:
 - **Command**: Execute shell commands and check exit codes
@@ -203,11 +208,44 @@ VulnGuard follows a layered architecture pattern:
 - **Service**: Check service status (enabled/active)
 - **Sysctl**: Verify kernel parameter values
 
+**OS Detection Mechanism**:
+
+The scanner uses `/etc/os-release` parsing to detect the operating system:
+
+1. **`_parse_os_release()`**: Parses ID and ID_LIKE fields from /etc/os-release
+2. **`_get_os_family()`**: Maps detected OS to primary OS family
+3. **`_is_os_compatible()`**: Checks rule compatibility using family-based matching
+
+**OS Family Map**:
+
+```python
+OS_FAMILY_MAP = {
+    "rhel": ["rhel", "red hat", "centos", "almalinux", "rocky"],
+    "debian": ["debian", "ubuntu"],
+}
+```
+
+**Supported Distributions**:
+- **RHEL Family**: RHEL, CentOS, AlmaLinux, Rocky Linux
+- **Debian Family**: Debian, Ubuntu
+
+**Status Field**:
+
+The `ScanResult` class includes a `status` field with the following values:
+
+| Status | Description |
+|--------|-------------|
+| `checked` | Rule was executed (compliant or not compliant) |
+| `skipped_os` | Rule skipped due to OS incompatibility |
+| `skipped_manual` | Rule manually disabled in configuration |
+| `not_applicable` | Rule not applicable for other reasons |
+
 **Design Decisions**:
 - No AI integration in scanner - all checks are deterministic
 - Strict rule validation before execution
-- OS compatibility filtering
+- OS compatibility filtering with family-based support
 - Timeout protection for all commands
+- Rules targeting "rhel" automatically apply to AlmaLinux, Rocky Linux, CentOS
 
 ### 2. Engine Module ([`vulnguard/pkg/engine/engine.py`](vulnguard/pkg/engine/engine.py))
 
@@ -218,11 +256,37 @@ VulnGuard follows a layered architecture pattern:
 - Determine risk levels based on severity and compliance
 - Decide if AI assistance is required
 - Determine approval requirements
-- Generate compliance summaries
+- Generate compliance summaries (excluding not_applicable rules)
 
 **Key Classes**:
 - [`ComplianceEngine`](vulnguard/pkg/engine/engine.py:65): Main evaluation engine
 - [`EvaluationResult`](vulnguard/pkg/engine/engine.py:13): Evaluation result data structure
+
+**Status Field**:
+
+The `EvaluationResult` class includes a `status` field with the following values:
+
+| Status | Description |
+|--------|-------------|
+| `evaluated` | Rule was evaluated (risk level determined) |
+| `not_applicable` | Rule not applicable (OS incompatible or other reason) |
+
+**Compliance Summary Calculation**:
+
+The `generate_summary()` method calculates compliance statistics as follows:
+
+```python
+# Filter out not applicable rules for compliance calculations	evaluated_rules = [r for r in evaluation_results if r.status != 'not_applicable']
+not_applicable_count = total_rules - len(evaluated_rules)
+
+compliant_count = sum(1 for r in evaluated_rules if r.compliant)
+non_compliant_count = len(evaluated_rules) - compliant_count
+```
+
+**Benefits**:
+- Not applicable rules don't skew compliance percentages
+- Clear distinction between evaluated and skipped rules
+- More accurate compliance reporting
 
 **Severity Normalization**:
 
@@ -238,12 +302,14 @@ VulnGuard follows a layered architecture pattern:
 **Risk Level Determination**:
 - Compliant rules → low risk
 - Non-compliant rules → mapped from normalized severity
+- Not applicable rules → low risk (excluded from calculations)
 
 **Design Decisions**:
 - Centralized severity mapping for consistency
 - Risk level based on both severity and compliance status
 - AI assist only for ambiguous cases
 - Approval gating for high-risk rules
+- Not applicable rules are excluded from compliance calculations
 
 ### 3. Advisor Module ([`vulnguard/pkg/advisor/advisor.py`](vulnguard/pkg/advisor/advisor.py))
 

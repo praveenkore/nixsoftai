@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269275"
+title: "AlmaLinux OS 9 must be configured so that all system device files are correctly labeled to prevent unauthorized modification."
+stig_id: "ALMA-09-022020"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269275"
+
+rationale: |
+  If an unauthorized or modified device is allowed to exist on the system, there is the possibility the system may perform unintended or unauthorized operations. Correct SELinux labeling ensures device access is controlled.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        # Check for device_t or unlabeled_t that shouldn't be there.
+        # Excluding /dev/vmci as per STIG notes.
+        find /dev -context *:device_t:* \( -type c -o -type b \) -not -path "/dev/vmci" -printf "%p %Z\n" | grep . && exit 1
+        find /dev -context *:unlabeled_t:* \( -type c -o -type b \) -printf "%p %Z\n" | grep . && exit 1
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify system device files are correctly labeled with SELinux contexts"
+    remediation:
+      commands:
+        - "restorecon -Rv /dev"
+      requires_restart: false
+      requires_reboot: false
+      description: "Restore SELinux policy for device files"
+    rollback:
+      commands:
+        - "# restorecon is generally safe and aligns with policy; no rollback provided."
+      description: "No rollback provided"

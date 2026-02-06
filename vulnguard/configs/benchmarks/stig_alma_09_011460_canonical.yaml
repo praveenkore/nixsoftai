@@ -1,0 +1,55 @@
+benchmark: STIG
+id: "V-269180"
+title: "AlmaLinux OS 9 must disable storing core dumps."
+stig_id: "ALMA-09-011460"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Setting Storage=none in coredump.conf is a secondary measure to prevent core dumps
+  from being stored by systemd-coredump, even if the socket were active.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^Storage=none", "/etc/systemd/coredump.conf"]
+      expected_state: "contains"
+      expected_value: "Storage=none"
+      description: "Verify Storage=none in coredump.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^#Storage=.*/Storage=none/' /etc/systemd/coredump.conf"
+        - "sed -i 's/^Storage=.*/Storage=none/' /etc/systemd/coredump.conf"
+        - "grep -q '^Storage=none' /etc/systemd/coredump.conf || echo 'Storage=none' >> /etc/systemd/coredump.conf"
+      requires_restart: false
+      requires_reboot: true
+      description: "Set Storage=none in coredump.conf"
+    rollback:
+      commands:
+        - "sed -i '/^Storage=none/d' /etc/systemd/coredump.conf"
+      description: "Remove Storage=none configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "^Storage=none", "/etc/systemd/coredump.conf"]
+      expected_state: "contains"
+      expected_value: "Storage=none"
+      description: "Verify Storage=none in coredump.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^#Storage=.*/Storage=none/' /etc/systemd/coredump.conf"
+        - "sed -i 's/^Storage=.*/Storage=none/' /etc/systemd/coredump.conf"
+        - "grep -q '^Storage=none' /etc/systemd/coredump.conf || echo 'Storage=none' >> /etc/systemd/coredump.conf"
+      requires_restart: false
+      requires_reboot: true
+      description: "Set Storage=none in coredump.conf"
+    rollback:
+      commands:
+        - "sed -i '/^Storage=none/d' /etc/systemd/coredump.conf"
+      description: "Remove Storage=none configuration"

@@ -3,8 +3,14 @@ id: "V-230263"
 title: "The operating system must configure kernel parameters to protect against symlink attacks."
 severity: high
 original_severity: "CAT II"
+# Universal check - sysctl parameters are consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Protected symlinks and hardlinks prevent TOCTOU (Time-of-check to Time-of-use) attacks."
 check:
   type: sysctl

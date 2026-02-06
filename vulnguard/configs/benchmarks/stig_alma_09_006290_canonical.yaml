@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269137"
+title: "AlmaLinux OS 9 must require a boot loader password."
+stig_id: "ALMA-09-006290"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000213
+srg: SRG-OS-000080-GPOS-00048
+
+rationale: |
+  Password protection on the boot loader configuration ensures users with physical access
+  cannot trivially alter important bootloader settings or enter single-user mode without auth.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^GRUB2_PASSWORD", "/boot/grub2/user.cfg"]
+      expected_state: "present"
+      expected_value: "GRUB2_PASSWORD"
+      description: "Verify GRUB2 password is set in user.cfg"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run grub2-setpassword to set bootloader password'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Placeholder for manual grub2 password setup"
+    rollback:
+      commands:
+        - "rm -f /boot/grub2/user.cfg"
+      description: "Remove bootloader password (Warning: insecure)"

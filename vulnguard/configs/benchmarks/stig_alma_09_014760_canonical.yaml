@@ -1,0 +1,50 @@
+benchmark: STIG
+id: "V-269210"
+title: "All AlmaLinux OS 9 local interactive user home directories must be group-owned by the home directory owner's primary group."
+stig_id: "ALMA-09-014760"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00230
+vulnerability_id: "V-269210"
+
+rationale: |
+  If the Group Identifier (GID) of a local interactive users home directory is not the same as the primary GID of the user, this would allow unauthorized access to the users files.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        for user in $(awk -F: '($3>=1000)&&($7 !~ /nologin/){print $1}' /etc/passwd); do
+          dir=$(getent passwd "$user" | cut -d: -f6)
+          primary_gid=$(id -g "$user")
+          dir_gid=$(stat -c "%g" "$dir")
+          if [ "$primary_gid" != "$dir_gid" ]; then
+            echo "Mismatch for $user: primary=$primary_gid dir=$dir_gid"
+            exit 1
+          fi
+        done
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify home directory group ownership matches user primary group"
+    remediation:
+      commands:
+        - |
+          for user in $(awk -F: '($3>=1000)&&($7 !~ /nologin/){print $1}' /etc/passwd); do
+            dir=$(getent passwd "$user" | cut -d: -f6)
+            primary_group=$(id -gn "$user")
+            if [ -d "$dir" ]; then
+              chgrp "$primary_group" "$dir"
+            fi
+          done
+      requires_restart: false
+      requires_reboot: false
+      description: "Correct home directory group ownership"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

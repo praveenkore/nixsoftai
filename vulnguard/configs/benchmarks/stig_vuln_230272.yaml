@@ -3,8 +3,14 @@ id: "V-230272"
 title: "The operating system must configure automatic security updates."
 severity: high
 original_severity: "CAT II"
+# Auto-updates are distribution-specific (apt/dnf/yum)
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Automatic security updates ensure that security patches are applied in a timely manner."
 check:
   type: file

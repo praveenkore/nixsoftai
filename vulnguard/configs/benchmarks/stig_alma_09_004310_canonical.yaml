@@ -1,0 +1,31 @@
+benchmark: STIG
+id: "V-269125"
+title: "AlmaLinux OS 9 must use the TuxCare FIPS repository."
+stig_id: "ALMA-09-004310"
+original_severity: "CAT I"
+severity: high
+cci: CCI-000068
+srg: SRG-OS-000033-GPOS-00014
+
+rationale: |
+  FIPS 140-3 validated packages are required for compliance.
+  For AlmaLinux, these are provided by the TuxCare FIPS repository which requires a license.
+
+implementations:
+  rhel_family:
+    os: ["almalinux"]
+    check:
+      type: command
+      command: ["dnf", "repolist"]
+      expected_state: "contains"
+      expected_value: "tuxcare-fips"
+      description: "Verify TuxCare FIPS repository is enabled"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Purchase and configure TuxCare ESU license to enable FIPS repos'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Placeholder for manual TuxCare FIPS setup"
+    rollback:
+      commands: []
+      description: "Manual rollback required"

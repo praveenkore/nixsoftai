@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269227"
+title: "AlmaLinux OS 9 /etc/shadow- file must be owned by root."
+stig_id: "ALMA-09-016740"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269227"
+
+rationale: |
+  The "/etc/shadow-" file is a backup file of "/etc/shadow", and as such, contains the list of local system accounts and password hashes. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%U %n", "/etc/shadow-"]
+      expected_state: "contains"
+      expected_value: "root /etc/shadow-"
+      description: "Verify that /etc/shadow- is owned by root"
+    remediation:
+      commands:
+        - "chown root /etc/shadow-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Change owner of /etc/shadow- to root"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert ownership change"

@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269271"
+title: "AlmaLinux OS 9 SSH daemon must prevent remote hosts from connecting to the proxy display."
+stig_id: "ALMA-09-021580"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269271"
+
+rationale: |
+  When X11 forwarding is enabled, there may be additional exposure to the server and client displays if the sshd proxy display is configured to listen on the wildcard address. By default, sshd binds the forwarding server to the loopback address.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sshd", "-T"]
+      script: |
+        sshd -T | grep -i "^x11uselocalhost" | grep "^x11uselocalhost yes"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify X11UseLocalhost is set to yes"
+    remediation:
+      commands:
+        - "if [ -d /etc/ssh/sshd_config.d ]; then echo 'X11UseLocalhost yes' > /etc/ssh/sshd_config.d/40-x11uselocalhost.conf; else sed -i '/^#*X11UseLocalhost/c\X11UseLocalhost yes' /etc/ssh/sshd_config; fi"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Enable X11 localhost proxy"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-x11uselocalhost.conf"
+        - "systemctl restart sshd.service"
+      description: "Disable X11 localhost proxy"

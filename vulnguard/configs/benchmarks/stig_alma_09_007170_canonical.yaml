@@ -1,0 +1,53 @@
+benchmark: STIG
+id: "V-269145"
+title: "AlmaLinux OS 9 must enable kernel parameters to enforce discretionary access control (DAC) on symlinks."
+stig_id: "ALMA-09-007170"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002235
+srg: SRG-OS-000324-GPOS-00125
+
+rationale: |
+  Enabling protected_symlinks prevents users from following symlinks in world-writable sticky directories
+  unless they own the symlink or the directory. This mitigates TOCTOU and other symlink attacks.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: sysctl
+      key: "fs.protected_symlinks"
+      expected_value: "1"
+      description: "Verify fs.protected_symlinks is set to 1"
+    remediation:
+      commands:
+        - "echo 'fs.protected_symlinks = 1' > /etc/sysctl.d/60-symlinks.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable protected symlinks kernel parameter"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/60-symlinks.conf"
+        - "sysctl -w fs.protected_symlinks=0"
+      description: "Disable protected symlinks"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: sysctl
+      key: "fs.protected_symlinks"
+      expected_value: "1"
+      description: "Verify fs.protected_symlinks is set to 1"
+    remediation:
+      commands:
+        - "echo 'fs.protected_symlinks = 1' > /etc/sysctl.d/60-symlinks.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable protected symlinks kernel parameter"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/60-symlinks.conf"
+        - "sysctl -w fs.protected_symlinks=0"
+      description: "Disable protected symlinks"

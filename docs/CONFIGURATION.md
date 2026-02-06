@@ -469,7 +469,7 @@ approval:
 
 ### OS Configuration
 
-Controls OS compatibility and version requirements.
+Controls OS compatibility, detection mechanism, and version requirements.
 
 ```yaml
 os:
@@ -478,44 +478,147 @@ os:
     - "ubuntu"                     # Ubuntu
     - "centos"                     # CentOS
     - "debian"                     # Debian
+    - "almalinux"                  # AlmaLinux (RHEL-compatible)
+    - "rocky"                      # Rocky Linux (RHEL-compatible)
   min_versions:
-    rhel: "8"                     # Minimum RHEL version
-    ubuntu: "20.04"                # Minimum Ubuntu version
-    centos: "8"                    # Minimum CentOS version
-    debian: "10"                   # Minimum Debian version
+    rhel: "8"
+    ubuntu: "20.04"
+    centos: "8"
+    debian: "10"
+    almalinux: "8"
+    rocky: "8"
 ```
 
 **Options:**
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `supported` | list | `["rhel", "ubuntu", "centos", "debian"]` | Supported OS types |
+| `supported` | list | See default | Supported OS types |
 | `min_versions` | object | See default | Minimum versions for each OS |
 
-**Supported OS Types:**
+#### Supported Operating Systems
 
-- **`rhel`**: Red Hat Enterprise Linux
-- **`ubuntu`**: Ubuntu
-- **`centos`**: CentOS
-- **`debian`**: Debian
+VulnGuard supports two main OS families:
 
-**Adding Custom OS Support:**
+**RHEL Family** (Red Hat-compatible distributions):
+- **`rhel`**: Red Hat Enterprise Linux 8+
+- **`centos`**: CentOS 8+ (including CentOS Stream)
+- **`almalinux`**: AlmaLinux 8+ (RHEL-compatible)
+- **`rocky`**: Rocky Linux 8+ (RHEL-compatible)
+
+**Debian Family** (Debian-compatible distributions):
+- **`debian`**: Debian 10+
+- **`ubuntu`**: Ubuntu 20.04+
+
+#### OS Detection Mechanism
+
+VulnGuard uses `/etc/os-release` parsing to detect the operating system:
+
+1. **ID Field**: The primary distribution identifier (e.g., `almalinux`, `ubuntu`, `rhel`)
+2. **ID_LIKE Field**: A space-separated list of OS families the distribution is compatible with (e.g., `rhel centos fedora`)
+
+**Example os-release entries:**
+
+```
+# AlmaLinux
+ID=almalinux
+ID_LIKE="rhel centos fedora"
+
+# Rocky Linux
+ID=rocky
+ID_LIKE="rhel centos fedora"
+
+# Ubuntu
+ID=ubuntu
+ID_LIKE="debian"
+
+# RHEL
+ID=rhel
+ID_LIKE="rhel fedora"
+```
+
+#### OS Family Mapping
+
+The `OS_FAMILY_MAP` enables family-based compatibility checking:
+
+```python
+OS_FAMILY_MAP = {
+    "rhel": ["rhel", "red hat", "centos", "almalinux", "rocky"],
+    "debian": ["debian", "ubuntu"],
+}
+```
+
+**How it works:**
+- Rules targeting `"rhel"` will automatically apply to AlmaLinux, Rocky Linux, and CentOS
+- Rules targeting `"debian"` will apply to both Debian and Ubuntu
+- This allows a single rule to cover multiple RHEL-compatible distributions
+
+**Example:** A rule with `os_compatibility: ["rhel"]` will run on:
+- Red Hat Enterprise Linux
+- CentOS
+- AlmaLinux
+- Rocky Linux
+
+#### Family-Based Compatibility
+
+The scanner performs two-level compatibility checking:
+
+1. **Direct Match**: Checks if the detected OS directly matches any entry in the rule's `os_compatibility` list
+2. **Family Match**: Checks if the detected OS family (from `ID_LIKE`) matches any entry in the rule's `os_compatibility` list
+
+This allows rules to target entire OS families without listing every distribution.
+
+**Example Rule Targeting RHEL Family:**
+
+```yaml
+os_compatibility:
+  - "rhel"  # Will match RHEL, CentOS, AlmaLinux, Rocky Linux
+```
+
+#### Adding Custom OS Distributions
+
+To add support for a new distribution:
+
+1. **Option 1: Add to existing family** (if the distribution is RHEL or Debian compatible):
 
 ```yaml
 os:
   supported:
     - "rhel"
-    - "ubuntu"
-    - "centos"
-    - "debian"
-    - "fedora"                    # Add custom OS
+    - "almalinux"
+    - "rocky"
+    - "newdistro"  # Add new distribution
   min_versions:
     rhel: "8"
-    ubuntu: "20.04"
-    centos: "8"
-    debian: "10"
-    fedora: "35"                  # Minimum Fedora version
+    almalinux: "8"
+    rocky: "8"
+    newdistro: "X"  # Minimum version
 ```
+
+2. **Option 2: Create new family** (if the distribution has unique requirements):
+
+```yaml
+os:
+  supported:
+    - "rhel"
+    - "debian"
+    - "suse"  # New family
+  min_versions:
+    rhel: "8"
+    debian: "10"
+    suse: "15"
+```
+
+**Note:** For new families, you may need to update the `OS_FAMILY_MAP` in the scanner module to enable family-based compatibility checking.
+
+#### Backward Compatibility
+
+The OS detection system is fully backward compatible:
+
+- Existing rules with `os_compatibility: ["rhel"]` will continue to work
+- Existing rules with `os_compatibility: ["centos"]` will continue to work
+- AlmaLinux and Rocky Linux are automatically detected as RHEL-compatible
+- Direct OS matches take precedence over family matches
 
 ---
 

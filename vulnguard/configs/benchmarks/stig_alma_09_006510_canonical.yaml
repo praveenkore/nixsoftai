@@ -1,0 +1,37 @@
+benchmark: STIG
+id: "V-269139"
+title: "AlmaLinux OS 9 must require authentication to access single-user mode."
+stig_id: "ALMA-09-006510"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000213
+srg: SRG-OS-000080-GPOS-00048
+
+rationale: |
+  Prevent attackers with physical access from easily bypassing security.
+  Authentication must be required for single-user (rescue) mode.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue", "/usr/lib/systemd/system/rescue.service"]
+      expected_state: "contains"
+      expected_value: "ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue"
+      description: "Verify rescue mode requires authentication"
+    remediation:
+      commands:
+        - "mkdir -p /etc/systemd/system/rescue.service.d"
+        - "echo '[Service]' > /etc/systemd/system/rescue.service.d/override.conf"
+        - "echo 'ExecStart=' >> /etc/systemd/system/rescue.service.d/override.conf"
+        - "echo 'ExecStart=-/usr/lib/systemd/systemd-sulogin-shell rescue' >> /etc/systemd/system/rescue.service.d/override.conf"
+        - "systemctl daemon-reload"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure systemd to require authentication for rescue mode"
+    rollback:
+      commands:
+        - "rm -f /etc/systemd/system/rescue.service.d/override.conf"
+        - "systemctl daemon-reload"
+      description: "Remove systemd override for rescue mode"

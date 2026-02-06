@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269267"
+title: "AlmaLinux OS 9 SSH daemon must not allow known hosts authentication."
+stig_id: "ALMA-09-021140"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269267"
+
+rationale: |
+  Configuring the IgnoreUserKnownHosts setting for the SSH daemon provides additional assurance that remote login via SSH will require a password, even in the event of misconfiguration elsewhere.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sshd", "-T"]
+      script: |
+        sshd -T | grep -i "^ignoreuserknownhosts" | grep "^ignoreuserknownhosts yes"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify IgnoreUserKnownHosts is set to yes"
+    remediation:
+      commands:
+        - "if [ -d /etc/ssh/sshd_config.d ]; then echo 'IgnoreUserKnownHosts yes' > /etc/ssh/sshd_config.d/40-knownhosts.conf; else sed -i '/^#*IgnoreUserKnownHosts/c\IgnoreUserKnownHosts yes' /etc/ssh/sshd_config; fi"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable known hosts authentication"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-knownhosts.conf"
+        - "systemctl restart sshd.service"
+      description: "Enable known hosts authentication"

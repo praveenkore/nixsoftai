@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269265"
+title: "AlmaLinux OS 9 SSH private host key files must have mode 0640 or less permissive."
+stig_id: "ALMA-09-020920"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269265"
+
+rationale: |
+  If an unauthorized user obtains the private SSH host key file, the host could be impersonated. Restricting access is critical for confidentiality of the key.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/ssh/ssh_host*key"]
+      script: |
+        stat -c "%a" /etc/ssh/ssh_host*key | grep -Ev "^640$|^600$|^400$|^0$"
+        if [ $? -eq 0 ]; then exit 1; else exit 0; fi
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify SSH private host keys have mode 0640 or less"
+    remediation:
+      commands:
+        - "chmod 0640 /etc/ssh/ssh_host*key"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Set mode of SSH private host key files to 0640"
+    rollback:
+      commands:
+        - "# Manual rollback required (restore previous permissions)"
+      description: "Manual rollback required"

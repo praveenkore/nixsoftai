@@ -1,0 +1,52 @@
+# VulnGuard Canonical STIG Rule V-230270
+# Refactored for multi-distribution support
+# SELinux Enforcement Mode security control
+
+benchmark: STIG
+id: "V-230270"
+title: "The operating system must implement SELinux in enforcing mode."
+original_severity: "CAT II"
+severity: high
+rationale: >
+  SELinux (Security-Enhanced Linux) provides mandatory access control (MAC) for 
+  Linux systems. In enforcing mode, SELinux enforces all security policies 
+  defined in the policy, preventing unauthorized actions and providing strong 
+  protection against privilege escalation and other attacks. Permissive mode logs 
+  violations but does not block them, which defeats the security purpose.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      parameter: ["getenforce"]
+      expected_state: "Enforcing"
+      expected_type: string
+    remediation:
+      commands:
+        - "setenforce 1"
+      requires_restart: false
+      requires_reboot: false
+    rollback:
+      commands:
+        - "setenforce 0"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      parameter: ["getenforce"]
+      expected_state: "Enforcing"
+      expected_type: string
+    remediation:
+      commands:
+        - "setenforce 1"
+      requires_restart: false
+      requires_reboot: false
+    rollback:
+      commands:
+        - "setenforce 0"
+
+approval_required: true
+exception_allowed: false
+ai_assist: false

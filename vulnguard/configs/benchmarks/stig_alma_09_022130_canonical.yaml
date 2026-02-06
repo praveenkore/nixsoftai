@@ -1,0 +1,43 @@
+benchmark: STIG
+id: "V-269276"
+title: "All AlmaLinux OS 9 local initialization files must have mode 0740 or less permissive."
+stig_id: "ALMA-09-022130"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269276"
+
+rationale: |
+  Local initialization files are used to configure the user's shell environment upon logon. Malicious modification of these files could compromise accounts upon logon.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        # Check all dot files in home directories. 0740 or less.
+        # find ... -perm -740 means "any bits in 740 are set", which is not quite right for "more permissive".
+        # We want to find files where (mode & ~0740) != 0.
+        # Or simpler: find files where group or others have bits they shouldn't.
+        # Group: should not have write (020) or exec (010) if they are just data, but STIG says 0740.
+        # So group can have rwx. Others should have nothing.
+        # find ... -perm /007 (any bits in others) or -perm /007 (wait, STIG says 0740).
+        # find ... -perm /037 (group write/exec, others rwx)
+        find /home/*/.[^.]* -maxdepth 0 -type f \( -perm /007 -o -perm /030 \) -exec stat -c "%a %n" {} + | grep . && exit 1
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify local initialization files have mode 0740 or less permissive"
+    remediation:
+      commands:
+        - "for home in /home/*; do [ -d \"$home\" ] && chmod 0740 \"$home\"/.[^.]* 2>/dev/null; done"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode of local initialization files to 0740"
+    rollback:
+      commands:
+        - "# Manual rollback required (identify previous permissions if needed)"
+      description: "Manual rollback required"

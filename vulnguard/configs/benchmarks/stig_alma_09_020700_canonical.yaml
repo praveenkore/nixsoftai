@@ -1,0 +1,39 @@
+benchmark: STIG
+id: "V-269263"
+title: "AlmaLinux OS 9 SSH server configuration files must have mode 0600 or less permissive."
+stig_id: "ALMA-09-020700"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269263"
+
+rationale: |
+  Service configuration files enable or disable features of their respective services, which if configured incorrectly, can lead to insecure and vulnerable configurations. Therefore, service configuration files must have restricted permissions to prevent unauthorized changes.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "/etc/ssh/sshd_config", "/etc/ssh/sshd_config.d", "-type", "f", "-exec", "stat", "-c", "%a", "{}", "+"]
+      script: |
+        # Permissions should be exactly 0600 or more restricted (lower number in bitmask context, but here we check against exactly 600 or less)
+        # Note: stat -c %a returns octal. We need to ensure it's not more permissive than 600.
+        # Actually STIG says 0600 exactly for files.
+        find /etc/ssh/sshd_config /etc/ssh/sshd_config.d -type f -exec stat -c "%a" {} + | grep -v "^600$" | grep -v "^400$" | grep -v "^0$"
+        if [ $? -eq 0 ]; then exit 1; else exit 0; fi
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify SSH configuration files have mode 0600 or less"
+    remediation:
+      commands:
+        - "chmod 0600 /etc/ssh/sshd_config"
+        - "find /etc/ssh/sshd_config.d -type f -exec chmod 0600 {} +"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode of SSH configuration files to 0600"
+    rollback:
+      commands:
+        - "# Manual rollback required (restore previous permissions)"
+      description: "Manual rollback required"

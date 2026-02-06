@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269200"
+title: "AlmaLinux OS 9 /etc/gshadow- file must be group-owned by root."
+stig_id: "ALMA-09-013660"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269200"
+
+rationale: |
+  The "/etc/gshadow-" file is a backup of "/etc/gshadow", and as such, contains group password hashes. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G %n", "/etc/gshadow-"]
+      expected_state: "contains"
+      expected_value: "root /etc/gshadow-"
+      description: "Verify that /etc/gshadow- is group-owned by root"
+    remediation:
+      commands:
+        - "chgrp root /etc/gshadow-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Change group owner of /etc/gshadow- to root"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert group ownership change"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G %n", "/etc/gshadow-"]
+      expected_state: "contains"
+      expected_value: "shadow /etc/gshadow-"
+      description: "Verify that /etc/gshadow- is group-owned by shadow (Debian standard)"
+    remediation:
+      commands:
+        - "chgrp shadow /etc/gshadow-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Change group owner of /etc/gshadow- to shadow"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert group ownership change"

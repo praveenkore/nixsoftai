@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269186"
+title: "AlmaLinux OS 9 /etc/crontab file must have mode 0600."
+stig_id: "ALMA-09-012120"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  The /etc/crontab file contains system-wide cron jobs. It must have mode 0600 to prevent
+  unauthorized reading or modification.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/crontab"]
+      expected_state: "exact"
+      expected_value: "600"
+      description: "Verify /etc/crontab has mode 600"
+    remediation:
+      commands:
+        - "chmod 0600 /etc/crontab"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode 0600 on /etc/crontab"
+    rollback:
+      commands:
+        - "chmod 0644 /etc/crontab"
+      description: "Revert /etc/crontab permissions"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/crontab"]
+      expected_state: "exact"
+      expected_value: "600"
+      description: "Verify /etc/crontab has mode 600"
+    remediation:
+      commands:
+        - "chmod 0600 /etc/crontab"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode 0600 on /etc/crontab"
+    rollback:
+      commands:
+        - "chmod 0644 /etc/crontab"
+      description: "Revert /etc/crontab permissions"

@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269240"
+title: "AlmaLinux OS 9 must use a file integrity tool that is configured to use FIPS 140-3-approved cryptographic hashes."
+stig_id: "ALMA-09-018170"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00226
+vulnerability_id: "V-269240"
+
+rationale: |
+  Using weak or non-approved cryptographic hashes for file integrity checks compromises the reliability of the verification.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^CONTENT_EX", "/etc/aide.conf"]
+      expected_state: "contains"
+      expected_value: "sha512"
+      description: "Verify AIDE rules use sha512"
+    remediation:
+      commands:
+        - "# Manual: Ensure 'sha512' is used in your AIDE rules in /etc/aide.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure AIDE to use sha512"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

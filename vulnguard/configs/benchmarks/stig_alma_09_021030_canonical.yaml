@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269266"
+title: "AlmaLinux OS 9 SSH public host key files must have mode 0644 or less permissive."
+stig_id: "ALMA-09-021030"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269266"
+
+rationale: |
+  If a public host key file is modified by an unauthorized user, the SSH service may be compromised. Whilst public keys are publicly readable, they should not be writeable by nonowners.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/ssh/ssh_host*key.pub"]
+      script: |
+        stat -c "%a" /etc/ssh/ssh_host*key.pub | grep -Ev "^644$|^600$|^400$|^0$"
+        if [ $? -eq 0 ]; then exit 1; else exit 0; fi
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify SSH public host keys have mode 0644 or less"
+    remediation:
+      commands:
+        - "chmod 0644 /etc/ssh/*key.pub"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Set mode of SSH public host key files to 0644"
+    rollback:
+      commands:
+        - "# Manual rollback required (restore previous permissions)"
+      description: "Manual rollback required"

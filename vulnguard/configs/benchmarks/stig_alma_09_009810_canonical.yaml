@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269165"
+title: "AlmaLinux OS 9 must check the GPG signature of locally installed software packages before installation."
+stig_id: "ALMA-09-009810"
+original_severity: "CAT I"
+severity: high
+cci: CCI-003992
+srg: SRG-OS-000366-GPOS-00153
+
+rationale: |
+  Ensuring local packages are also signed prevents users from installing unsigned/malicious RPMs manually.
+  'localpkg_gpgcheck=1' enforces this.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^localpkg_gpgcheck=1", "/etc/dnf/dnf.conf"]
+      expected_state: "contains"
+      expected_value: "localpkg_gpgcheck=1"
+      description: "Verify localpkg_gpgcheck is enabled in dnf.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^localpkg_gpgcheck.*/localpkg_gpgcheck=1/' /etc/dnf/dnf.conf"
+        - "grep -q '^localpkg_gpgcheck=1' /etc/dnf/dnf.conf || echo 'localpkg_gpgcheck=1' >> /etc/dnf/dnf.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable localpkg_gpgcheck in dnf.conf"
+    rollback:
+      commands:
+        - "sed -i '/^localpkg_gpgcheck=1/d' /etc/dnf/dnf.conf"
+      description: "Remove localpkg_gpgcheck configuration"

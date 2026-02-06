@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269100"
+title: "SSH daemon must be configured to use only FIPS 140-3 approved ciphers."
+stig_id: "UBUNTU-22-010080"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  Without cryptographic integrity protections, information can be altered by unauthorized users
+  without detection. The SSH daemon must be configured to use only ciphers employing FIPS 140-3
+  approved algorithms to protect the confidentiality of SSH connections.
+
+implementations:
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-i", "Ciphers", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes128-ctr"
+      description: "Verify SSH Ciphers are set to FIPS-approved algorithms"
+    remediation:
+      commands:
+        - "sed -i '/^Ciphers/d' /etc/ssh/sshd_config"
+        - "echo 'Ciphers aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes128-ctr' >> /etc/ssh/sshd_config"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure SSH daemon to use FIPS-approved ciphers"
+      service_restart: "sshd"
+    rollback:
+      commands:
+        - "sed -i '/^Ciphers/d' /etc/ssh/sshd_config"
+      description: "Remove Ciphers configuration from SSH config"
+      service_restart: "sshd"

@@ -1,0 +1,50 @@
+benchmark: STIG
+id: "V-269193"
+title: "AlmaLinux OS 9 /etc/group- file must have mode 0644 or less permissive."
+stig_id: "ALMA-09-012890"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  The /etc/group- file should be readable by all but only writable by root (0644).
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/group-"]
+      expected_state: "exact"
+      expected_value: "644"
+      description: "Verify /etc/group- has mode 644 or less"
+    remediation:
+      commands:
+        - "chmod 0644 /etc/group-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode 0644 on /etc/group-"
+    rollback:
+      commands:
+        - "chmod 0664 /etc/group-"
+      description: "Revert /etc/group- permissions"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/group-"]
+      expected_state: "exact"
+      expected_value: "644"
+      description: "Verify /etc/group- has mode 644 or less"
+    remediation:
+      commands:
+        - "chmod 0644 /etc/group-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode 0644 on /etc/group-"
+    rollback:
+      commands:
+        - "chmod 0664 /etc/group-"
+      description: "Revert /etc/group- permissions"

@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269269"
+title: "AlmaLinux OS 9 SSH daemon must not allow rhosts authentication."
+stig_id: "ALMA-09-021360"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269269"
+
+rationale: |
+  SSH trust relationships mean a compromise on one host can allow an attacker to move trivially to other hosts. rhosts authentication is inherently insecure.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sshd", "-T"]
+      script: |
+        sshd -T | grep -i "^ignorerhosts" | grep "^ignorerhosts yes"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify IgnoreRhosts is set to yes"
+    remediation:
+      commands:
+        - "if [ -d /etc/ssh/sshd_config.d ]; then echo 'IgnoreRhosts yes' > /etc/ssh/sshd_config.d/40-rhosts.conf; else sed -i '/^#*IgnoreRhosts/c\IgnoreRhosts yes' /etc/ssh/sshd_config; fi"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable rhosts authentication"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-rhosts.conf"
+        - "systemctl restart sshd.service"
+      description: "Enable rhosts authentication"

@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269235"
+title: "AlmaLinux OS 9 must define default permissions for all authenticated users in such a way that the user can only read and modify their own files."
+stig_id: "ALMA-09-017620"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00228
+vulnerability_id: "V-269235"
+
+rationale: |
+  Setting the most restrictive default permissions ensures that when new accounts are created they do not have unnecessary access.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^UMASK", "/etc/login.defs"]
+      expected_state: "contains"
+      expected_value: "077"
+      description: "Verify UMASK is 077 in /etc/login.defs"
+    remediation:
+      commands:
+        - "sed -i 's/^UMASK.*/UMASK 077/' /etc/login.defs"
+        - "grep -q '^UMASK' /etc/login.defs || echo 'UMASK 077' >> /etc/login.defs"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set UMASK to 077 in /etc/login.defs"
+    rollback:
+      commands:
+        - "sed -i 's/^UMASK 077/UMASK 022/' /etc/login.defs"
+      description: "Revert UMASK to default 022"

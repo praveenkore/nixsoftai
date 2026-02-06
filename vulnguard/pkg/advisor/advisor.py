@@ -147,6 +147,31 @@ class AIAdvisor:
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
     
+    def shutdown(self, wait: bool = True) -> None:
+        """
+        Shutdown the AI advisor and cleanup resources.
+        
+        Args:
+            wait: Whether to wait for pending futures to complete
+        """
+        self.logger.log_info("Shutting down AI advisor...")
+        
+        # Shutdown the thread pool executor
+        if self.executor:
+            self.executor.shutdown(wait=wait)
+        
+        # Close HTTP clients in LLM module
+        from vulnguard.pkg.advisor.llm_client import close_http_clients
+        close_http_clients()
+        
+        self.logger.log_info("AI advisor shutdown complete")
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown(wait=False)
+    
     def _init_llm_client(self, llm_config: Dict[str, Any]) -> None:
         """
         Initialize the LLM client based on configuration.
@@ -168,6 +193,10 @@ class AIAdvisor:
                 provider_config = llm_config.get('openai', {})
             elif provider == 'anthropic':
                 provider_config = llm_config.get('anthropic', {})
+            elif provider == 'openrouter':
+                provider_config = llm_config.get('openrouter', {})
+            elif provider == 'ollama':
+                provider_config = llm_config.get('ollama', {})
             elif provider == 'local':
                 provider_config = llm_config.get('local', {})
             elif provider == 'mock':
@@ -513,7 +542,7 @@ class AIAdvisor:
         
         return json.dumps(ai_output)
     
-    def get_advisory(
+    def _process_single_advisory(
         self,
         rule_id: str,
         scan_result: ScanResult,
@@ -521,7 +550,7 @@ class AIAdvisor:
         rule_data: Optional[Dict[str, Any]] = None
     ) -> tuple[Optional[AIAdvisory], str]:
         """
-        Get AI advisory for a rule.
+        Process a single AI advisory (internal helper for thread pool).
         
         Args:
             rule_id: Rule identifier
@@ -596,6 +625,100 @@ class AIAdvisor:
         )
         
         return advisory, ""
+
+    def get_advisory(
+        self,
+        rule_id: str,
+        scan_result: ScanResult,
+        evaluation_result: EvaluationResult,
+        rule_data: Optional[Dict[str, Any]] = None
+    ) -> tuple[Optional[AIAdvisory], str]:
+        """
+        Get AI advisory for a rule.
+        
+        Args:
+            rule_id: Rule identifier
+            scan_result: Scan result from the scanner
+            evaluation_result: Evaluation result from the engine
+            rule_data: Optional rule configuration data
+            
+        Returns:
+            Tuple of (AIAdvisory object or None, error message)
+        """
+        return self._process_single_advisory(
+            rule_id=rule_id,
+            scan_result=scan_result,
+            evaluation_result=evaluation_result,
+            rule_data=rule_data
+        )
+    
+    def get_advisories_batch(
+        self,
+        items: List[tuple[str, ScanResult, EvaluationResult, Optional[Dict[str, Any]]]]
+    ) -> List[AIAdvisory]:
+        """
+        Get AI advisories for multiple rules concurrently.
+        
+        This method processes multiple AI advisory requests in parallel using
+        the thread pool executor, significantly improving performance when
+        multiple rules require AI assistance.
+        
+        Args:
+            items: List of tuples containing (rule_id, scan_result, evaluation_result, rule_data)
+            
+        Returns:
+            List of AIAdvisory objects (excluding failed or skipped advisories)
+        """
+        if not items:
+            return []
+        
+        self.logger.log_info(f"Processing {len(items)} AI advisories concurrently with {self.max_workers} workers")
+        
+        # Submit all tasks to the executor
+        futures = []
+        for rule_id, scan_result, eval_result, rule_data in items:
+            future = self.executor.submit(
+                self._process_single_advisory,
+                rule_id,
+                scan_result,
+                eval_result,
+                rule_data
+            )
+            futures.append((future, rule_id))
+        
+        # Collect results as they complete
+        advisories = []
+        failed_count = 0
+        skipped_count = 0
+        
+        from concurrent.futures import as_completed
+        
+        for future, rule_id in futures:
+            try:
+                advisory, error = future.result()
+                if advisory:
+                    advisories.append(advisory)
+                elif error == "AI assist not required for this rule":
+                    skipped_count += 1
+                else:
+                    failed_count += 1
+                    self.logger.log_warning(
+                        f"AI advisory failed for rule {rule_id}: {error}"
+                    )
+            except Exception as e:
+                failed_count += 1
+                self.logger.log_error(
+                    "ai_advisory_batch",
+                    f"Exception processing rule {rule_id}: {str(e)}",
+                    {"rule_id": rule_id}
+                )
+        
+        self.logger.log_info(
+            f"Batch processing complete: {len(advisories)} successful, "
+            f"{failed_count} failed, {skipped_count} skipped"
+        )
+        
+        return advisories
     
     def requires_manual_review(
         self,

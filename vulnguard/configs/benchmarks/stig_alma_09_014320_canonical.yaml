@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269206"
+title: "The graphical display manager must not be the default target on AlmaLinux OS 9 unless approved."
+stig_id: "ALMA-09-014320"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269206"
+
+rationale: |
+  Unnecessary service packages must not be installed to decrease the attack surface of the system. Graphical display managers have a long history of security vulnerabilities and must not be used, unless approved and documented.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["systemctl", "get-default"]
+      expected_state: "contains"
+      expected_value: "multi-user.target"
+      description: "Verify that default target is multi-user.target"
+    remediation:
+      commands:
+        - "systemctl set-default multi-user.target"
+      requires_restart: true
+      requires_reboot: true
+      description: "Set default target to multi-user.target"
+    rollback:
+      commands:
+        - "systemctl set-default graphical.target"
+      description: "Revert default target to graphical.target"

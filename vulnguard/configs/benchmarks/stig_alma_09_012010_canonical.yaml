@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269185"
+title: "AlmaLinux OS 9 cron configuration directories must have a mode of 0700 or less permissive."
+stig_id: "ALMA-09-012010"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Cron directories should be accessible only by root (mode 0700) to prevent information leakage
+  or unauthorized access to job definitions.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/cron.monthly", "/etc/cron.weekly"]
+      expected_state: "exact"
+      expected_value: "700\n700\n700\n700\n700"
+      description: "Verify cron directories have mode 700"
+    remediation:
+      commands:
+        - "chmod 0700 /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set permissions of cron directories to 0700"
+    rollback:
+      commands:
+        - "chmod 0755 /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly"
+      description: "Revert cron dir permissions"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/cron.monthly", "/etc/cron.weekly"]
+      expected_state: "exact"
+      expected_value: "700\n700\n700\n700\n700"
+      description: "Verify cron directories have mode 700"
+    remediation:
+      commands:
+        - "chmod 0700 /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set permissions of cron directories to 0700"
+    rollback:
+      commands:
+        - "chmod 0755 /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly"
+      description: "Revert cron dir permissions"

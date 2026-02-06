@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269160"
+title: "AlmaLinux OS 9 must have the s-nail package installed."
+stig_id: "ALMA-09-009260"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001744
+srg: SRG-OS-000363-GPOS-00150
+
+rationale: |
+  The 's-nail' package (or equivalent 'mailutils' on Debian) provides the mail command required
+  to allow sending email notifications of unauthorized configuration changes to designated personnel.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["rpm", "-q", "s-nail"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify s-nail package is installed"
+    remediation:
+      commands:
+        - "dnf install -y s-nail"
+      requires_restart: false
+      requires_reboot: false
+      description: "Install s-nail via dnf"
+    rollback:
+      commands:
+        - "dnf remove -y s-nail"
+      description: "Remove s-nail package"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["dpkg", "-s", "mailutils"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify mailutils package is installed"
+    remediation:
+      commands:
+        - "apt-get install -y mailutils"
+      requires_restart: false
+      requires_reboot: false
+      description: "Install mailutils via apt"
+    rollback:
+      commands:
+        - "apt-get remove -y mailutils"
+      description: "Remove mailutils package"

@@ -1,0 +1,41 @@
+benchmark: STIG
+id: "V-269246"
+title: "AlmaLinux OS 9 firewall must employ a deny-all, allow-by-exception policy."
+stig_id: "ALMA-09-018830"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269246"
+
+rationale: |
+  Failure to restrict network connectivity only to authorized systems permits inbound connections from malicious systems.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        # Check if default zone is drop
+        DEFAULT_ZONE=$(firewall-cmd --get-default-zone)
+        TARGET=$(firewall-cmd --info-zone="$DEFAULT_ZONE" | grep target | awk '{print $2}')
+        if [ "$TARGET" != "DROP" ] && [ "$DEFAULT_ZONE" != "drop" ]; then
+          exit 1
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify firewalld default zone has DROP target"
+    remediation:
+      commands:
+        - "firewall-cmd --set-default-zone=drop"
+        - "# Note: Verify active interfaces are assigned to this zone manually if needed."
+      requires_restart: false
+      requires_reboot: false
+      description: "Set firewalld default zone to drop"
+    rollback:
+      commands:
+        - "firewall-cmd --set-default-zone=public"
+      description: "Revert default zone to public"

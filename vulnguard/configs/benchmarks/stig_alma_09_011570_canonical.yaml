@@ -1,0 +1,55 @@
+benchmark: STIG
+id: "V-269181"
+title: "AlmaLinux OS 9 must disable core dump backtraces."
+stig_id: "ALMA-09-011570"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Setting ProcessSizeMax=0 in coredump.conf ensures that no memory is processed for core dumps,
+  preventing the generation of backtraces which could reveal sensitive data.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^ProcessSizeMax=0", "/etc/systemd/coredump.conf"]
+      expected_state: "contains"
+      expected_value: "ProcessSizeMax=0"
+      description: "Verify ProcessSizeMax=0 in coredump.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^#ProcessSizeMax=.*/ProcessSizeMax=0/' /etc/systemd/coredump.conf"
+        - "sed -i 's/^ProcessSizeMax=.*/ProcessSizeMax=0/' /etc/systemd/coredump.conf"
+        - "grep -q '^ProcessSizeMax=0' /etc/systemd/coredump.conf || echo 'ProcessSizeMax=0' >> /etc/systemd/coredump.conf"
+      requires_restart: false
+      requires_reboot: true
+      description: "Set ProcessSizeMax=0 in coredump.conf"
+    rollback:
+      commands:
+        - "sed -i '/^ProcessSizeMax=0/d' /etc/systemd/coredump.conf"
+      description: "Remove ProcessSizeMax=0 configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "^ProcessSizeMax=0", "/etc/systemd/coredump.conf"]
+      expected_state: "contains"
+      expected_value: "ProcessSizeMax=0"
+      description: "Verify ProcessSizeMax=0 in coredump.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^#ProcessSizeMax=.*/ProcessSizeMax=0/' /etc/systemd/coredump.conf"
+        - "sed -i 's/^ProcessSizeMax=.*/ProcessSizeMax=0/' /etc/systemd/coredump.conf"
+        - "grep -q '^ProcessSizeMax=0' /etc/systemd/coredump.conf || echo 'ProcessSizeMax=0' >> /etc/systemd/coredump.conf"
+      requires_restart: false
+      requires_reboot: true
+      description: "Set ProcessSizeMax=0 in coredump.conf"
+    rollback:
+      commands:
+        - "sed -i '/^ProcessSizeMax=0/d' /etc/systemd/coredump.conf"
+      description: "Remove ProcessSizeMax=0 configuration"

@@ -1,0 +1,48 @@
+benchmark: STIG
+id: "V-269197"
+title: "The /boot/grub2/grub.cfg file must be group-owned by root."
+stig_id: "ALMA-09-013330"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  The grub configuration file must be protected from unauthorized changes.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G", "/boot/grub2/grub.cfg"]
+      expected_state: "exact"
+      expected_value: "root"
+      description: "Verify /boot/grub2/grub.cfg is group-owned by root"
+    remediation:
+      commands:
+        - "chgrp root /boot/grub2/grub.cfg"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set group ownership of grub.cfg to root"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G", "/boot/grub/grub.cfg"]
+      expected_state: "exact"
+      expected_value: "root"
+      description: "Verify /boot/grub/grub.cfg is group-owned by root"
+    remediation:
+      commands:
+        - "chgrp root /boot/grub/grub.cfg"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set group ownership of grub.cfg to root"
+    rollback:
+      commands: []
+      description: "Manual rollback"

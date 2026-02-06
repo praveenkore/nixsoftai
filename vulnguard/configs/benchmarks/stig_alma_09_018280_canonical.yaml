@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269241"
+title: "AlmaLinux OS 9 must be configured so that the file integrity tool verifies extended attributes."
+stig_id: "ALMA-09-018280"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00226
+vulnerability_id: "V-269241"
+
+rationale: |
+  Extended attributes can affect file security (e.g., SELinux labels). Validation must include checking for changes to extended attributes.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^CONTENT_EX", "/etc/aide.conf"]
+      expected_state: "contains"
+      expected_value: "+xattrs"
+      description: "Verify AIDE rules include +xattrs"
+    remediation:
+      commands:
+        - "# Manual: Ensure 'xattrs' is included in your AIDE rules in /etc/aide.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Add +xattrs to AIDE configuration"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

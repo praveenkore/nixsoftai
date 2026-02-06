@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269277"
+title: "AlmaLinux OS 9 must have the gnutls-utils package installed."
+stig_id: "ALMA-09-022240"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269277"
+
+rationale: |
+  GnuTLS is a secure communications library implementing the SSL, TLS, and DTLS protocols. This package contains command line TLS client and server and certificate manipulation tools.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["rpm", "-q", "gnutls-utils"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify gnutls-utils package is installed"
+    remediation:
+      commands:
+        - "dnf install -y gnutls-utils"
+      requires_restart: false
+      requires_reboot: false
+      description: "Install gnutls-utils package"
+    rollback:
+      commands:
+        - "dnf remove -y gnutls-utils"
+      description: "Remove gnutls-utils package"

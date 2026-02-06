@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269234"
+title: "AlmaLinux OS 9 must set the umask value to 077 for all local interactive user accounts."
+stig_id: "ALMA-09-017510"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00228
+vulnerability_id: "V-269234"
+
+rationale: |
+  Setting the most restrictive default permissions ensures that when new accounts are created they do not have unnecessary access. With a UMASK of 077, files will be created with 0600 permissions.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        grep -ir "umask" /home | grep -vE ':077|:0077' | grep -v ".bash_history"
+        if [ $? -eq 0 ]; then
+             exit 1 # Found umask other than 077
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify user initialization files do not set umask less restrictive than 077"
+    remediation:
+      commands:
+        - "# Manual remediation required: Edit user initialization files to remove or correct umask."
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation required"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

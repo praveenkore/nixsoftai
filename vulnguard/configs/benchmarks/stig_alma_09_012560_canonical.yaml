@@ -1,0 +1,49 @@
+benchmark: STIG
+id: "V-269190"
+title: "All AlmaLinux OS 9 local files and directories must have a valid owner."
+stig_id: "ALMA-09-012560"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Files without a valid owner (UID not in /etc/passwd) may be subject to unauthorized access
+  if a new user is created with that UID.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "/", "-xdev", "-nouser", "-print"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify no files exist without a valid owner"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find / -xdev -nouser to identify and chown files'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for valid ownership"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["find", "/", "-xdev", "-nouser", "-print"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify no files exist without a valid owner"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find / -xdev -nouser to identify and chown files'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for valid ownership"
+    rollback:
+      commands: []
+      description: "Manual rollback"

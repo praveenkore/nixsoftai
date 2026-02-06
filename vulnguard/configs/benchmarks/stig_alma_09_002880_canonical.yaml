@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269112"
+title: "All AlmaLinux OS 9 remote access methods must be monitored."
+stig_id: "ALMA-09-002880"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000067
+srg: SRG-OS-000032-GPOS-00013
+
+rationale: |
+  Remote access services, such as those providing remote access to network devices and information
+  systems, which lack automated monitoring capabilities, increase risk. Monitoring of remote access
+  can be used to spot attacks such as brute-force authentication attempts and denial-of-service (DoS)
+  attacks.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-rsE", "^(auth|authpriv|daemon)\\.*", "/etc/rsyslog.conf", "/etc/rsyslog.d/*.conf"]
+      expected_state: "contains"
+      expected_value: "authpriv"
+      description: "Verify authpriv logging is configured for remote access monitoring"
+    remediation:
+      commands:
+        - "echo 'auth.*;authpriv.*;daemon.* /var/log/secure' >> /etc/rsyslog.d/security.conf"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure rsyslog to log auth, authpriv, and daemon to /var/log/secure"
+      service_restart: "rsyslog"
+    rollback:
+      commands:
+        - "sed -i '/auth.*;authpriv.*;daemon.* /var\\/log\\/secure/d' /etc/rsyslog.d/security.conf"
+      description: "Remove authpriv logging configuration"
+      service_restart: "rsyslog"

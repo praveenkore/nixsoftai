@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269239"
+title: "AlmaLinux OS 9 must be configured so that the file integrity tool verifies Access Control Lists (ACLs)."
+stig_id: "ALMA-09-018060"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00226
+vulnerability_id: "V-269239"
+
+rationale: |
+  ACLs provide a fine-grained permission mechanism. If the file integrity tool does not verify ACLs, unauthorized changes to permissions may go undetected.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^CONTENT_EX", "/etc/aide.conf"]
+      expected_state: "contains"
+      expected_value: "+acl"
+      description: "Verify AIDE rules include +acl"
+    remediation:
+      commands:
+        - "# Manual: Ensure 'acl' is included in your AIDE rules in /etc/aide.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Add +acl to AIDE configuration"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

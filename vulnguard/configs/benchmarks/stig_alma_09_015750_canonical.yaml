@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269218"
+title: "AlmaLinux OS 9 must not allow blank or null passwords."
+stig_id: "ALMA-09-015750"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269218"
+
+rationale: |
+  If an account has an empty password, anyone could log in and run commands with the privileges of that account. Accounts with empty passwords should never be used in operational environments.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "nullok", "/etc/pam.d/system-auth", "/etc/pam.d/password-auth"]
+      expected_state: "not_contains"
+      expected_value: "nullok"
+      description: "Verify nullok is not present in PAM configuration files"
+    remediation:
+      commands:
+        - "sed -i 's/nullok//g' /etc/pam.d/system-auth"
+        - "sed -i 's/nullok//g' /etc/pam.d/password-auth"
+      requires_restart: false
+      requires_reboot: false
+      description: "Remove nullok from PAM configuration"
+    rollback:
+      commands:
+        - "# Manual rollback required (authselect recommended)"
+      description: "Manual rollback required"

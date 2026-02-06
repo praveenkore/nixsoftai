@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269164"
+title: "AlmaLinux OS 9 must ensure cryptographic verification of vendor software packages."
+stig_id: "ALMA-09-009700"
+original_severity: "CAT I"
+severity: high
+cci: CCI-003992
+srg: SRG-OS-000366-GPOS-00153
+
+rationale: |
+  Changes to software components can have significant security effects.
+  Verifying package signatures against trusted vendor keys (AlmaLinux, TuxCare) ensures integrity.
+
+implementations:
+  rhel_family:
+    os: ["almalinux"]
+    check:
+      type: command
+      command: ["rpm", "-q", "gpg-pubkey"]
+      expected_state: "contains"
+      expected_value: "AlmaLinux"
+      description: "Verify AlmaLinux GPG key is installed"
+    remediation:
+      commands:
+        - "rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux-9"
+        - "rpm --import https://repo.tuxcare.com/tuxcare/RPM-GPG-KEY-TuxCare"
+      requires_restart: false
+      requires_reboot: false
+      description: "Import AlmaLinux and TuxCare GPG keys"
+    rollback:
+      commands: []
+      description: "Manual rollback (rpm -e gpg-pubkey-...)"

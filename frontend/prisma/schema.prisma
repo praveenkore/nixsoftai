@@ -1,0 +1,216 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Agent {
+  id              String   @id @default(uuid())
+  hostname        String   @unique
+  displayName     String?
+  os              String
+  osVersion       String
+  osCodename      String?
+  architecture    String?
+  kernelVersion   String?
+  ipAddress       String?
+  macAddress      String?
+  agentVersion    String?
+  status          String   @default("pending")
+  lastSeen        DateTime @default(now())
+  firstSeen       DateTime @default(now())
+  environment     String   @default("production")
+  team            String?
+  datacenter      String?
+  labels          Json     @default("{}")
+  config          Json     @default("{}")
+  scanSessions    ScanSession[]
+  currentResults  CurrentScanResult[]
+  approvals       Approval[]
+  exceptions      Exception[]
+
+  @@index([status])
+  @@index([environment])
+  @@index([team])
+  @@index([lastSeen])
+}
+
+model User {
+  id            String      @id @default(uuid())
+  username      String      @unique
+  email         String?     @unique
+  role          String      @default("viewer")
+  permissions   Json        @default("{}")
+  createdAt     DateTime    @default(now())
+  lastLogin     DateTime?
+  isActive      Boolean     @default(true)
+  decisions     Approval[]  @relation("UserDecisions")
+  approvedExceptions Exception[] @relation("ApprovedExceptions")
+  revokedExceptions  Exception[] @relation("RevokedExceptions")
+  updatedConfigs     SystemConfig[]
+}
+
+model Rule {
+  id                String   @id
+  benchmark         String
+  benchmarkVersion  String?
+  title             String
+  description       String?
+  rationale         String?
+  severity          String
+  originalSeverity  String?
+  checkType         String
+  remediationCmds   String[]
+  rollbackCmds      String[]
+  requiresRestart   Boolean  @default(false)
+  requiresReboot    Boolean  @default(false)
+  osCompatibility   String[]
+  cisControl        String?
+  cisSubcontrol     String?
+  stigId            String?
+  nistMapping       String[]
+  aiAssist          Boolean  @default(false)
+  approvalRequired  Boolean  @default(false)
+  exceptionAllowed  Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  currentResults    CurrentScanResult[]
+  approvals         Approval[]
+  exceptions        Exception[]
+
+  @@index([benchmark])
+  @@index([severity])
+}
+
+model ScanSession {
+  id                  String    @id @default(uuid())
+  agentId             String
+  agent               Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  initiatedBy         String    @default("system")
+  initiatedVia        String    @default("scheduled")
+  startedAt           DateTime  @default(now())
+  completedAt         DateTime?
+  durationMs          Int?
+  totalRules          Int       @default(0)
+  compliantCount      Int       @default(0)
+  nonCompliantCount   Int       @default(0)
+  errorCount          Int       @default(0)
+  status              String    @default("running")
+  errorMessage        String?
+  compliancePercentage Decimal?
+  createdAt           DateTime  @default(now())
+  results             CurrentScanResult[]
+  approvals           Approval[]
+
+  @@index([agentId])
+  @@index([status])
+  @@index([startedAt(sort: Desc)])
+  @@index([compliancePercentage])
+}
+
+model CurrentScanResult {
+  id                String      @id @default(uuid())
+  agentId           String
+  agent             Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  ruleId            String
+  rule              Rule        @relation(fields: [ruleId], references: [id])
+  sessionId         String?
+  session           ScanSession? @relation(fields: [sessionId], references: [id])
+  compliant         Boolean
+  expectedState     String?
+  actualState       String?
+  checkOutput       String?
+  errorMessage      String?
+  severity          String?
+  riskLevel         String?
+  aiAssistRequired  Boolean     @default(false)
+  approvalRequired  Boolean     @default(false)
+  firstDetected     DateTime    @default(now())
+  lastScanned       DateTime    @default(now())
+  scanCount         Int         @default(1)
+  approvals         Approval[]
+
+  @@unique([agentId, ruleId])
+  @@index([agentId])
+  @@index([ruleId])
+  @@index([compliant])
+  @@index([riskLevel])
+  @@index([approvalRequired])
+}
+
+model Approval {
+  id                String      @id @default(uuid())
+  scanResultId      String?
+  scanResult        CurrentScanResult? @relation(fields: [scanResultId], references: [id])
+  agentId           String
+  agent             Agent       @relation(fields: [agentId], references: [id])
+  ruleId            String
+  rule              Rule        @relation(fields: [ruleId], references: [id])
+  sessionId         String?
+  session           ScanSession? @relation(fields: [sessionId], references: [id])
+  requestType       String      @default("remediation")
+  status            String      @default("pending")
+  aiAnalysis        String?
+  aiConfidence      Decimal?
+  recommendedCmds   String[]
+  rollbackCmds      String[]
+  requiresRestart   Boolean?
+  requiresReboot    Boolean?
+  dryRunOutput      String?
+  dryRunSuccess     Boolean?
+  requestedAt       DateTime    @default(now())
+  requestedBy       String?
+  expiresAt         DateTime?
+  decidedAt         DateTime?
+  decidedBy         String?
+  decider           User?       @relation("UserDecisions", fields: [decidedBy], references: [id])
+  decisionNotes     String?
+  executedAt        DateTime?
+  executionResult   Json?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  exceptions        Exception[]
+
+  @@index([status])
+  @@index([agentId])
+  @@index([ruleId])
+  @@index([requestedAt(sort: Desc)])
+  @@index([expiresAt])
+}
+
+model Exception {
+  id            String    @id @default(uuid())
+  agentId       String
+  agent         Agent     @relation(fields: [agentId], references: [id])
+  ruleId        String
+  rule          Rule      @relation(fields: [ruleId], references: [id])
+  reason        String
+  approvedBy    String
+  approver      User      @relation("ApprovedExceptions", fields: [approvedBy], references: [id])
+  approvedAt    DateTime  @default(now())
+  validFrom     DateTime  @default(now())
+  validUntil    DateTime
+  status        String    @default("active")
+  revokedBy     String?
+  revoker       User?     @relation("RevokedExceptions", fields: [revokedBy], references: [id])
+  revokedAt     DateTime?
+  revokeReason  String?
+  approvalId    String?
+  approval      Approval? @relation(fields: [approvalId], references: [id])
+  createdAt     DateTime  @default(now())
+
+  @@index([agentId, ruleId])
+  @@index([status])
+  @@index([validUntil])
+}
+
+model SystemConfig {
+  key           String    @id
+  value         Json
+  description   String?
+  updatedAt     DateTime  @default(now())
+  updatedBy     String?
+  updater       User?     @relation(fields: [updatedBy], references: [id])
+}

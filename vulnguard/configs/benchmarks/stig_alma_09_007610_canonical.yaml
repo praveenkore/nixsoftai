@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269148"
+title: "AlmaLinux OS 9 must automatically lock the root account until the root account is released by an administrator."
+stig_id: "ALMA-09-007610"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000044
+srg: SRG-OS-000021-GPOS-00005
+
+rationale: |
+  The root account must also be subject to locking to prevent brute-force attacks against administrative access.
+  'even_deny_root' enforces this behavior.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^even_deny_root", "/etc/security/faillock.conf"]
+      expected_state: "present"
+      expected_value: "even_deny_root"
+      description: "Verify even_deny_root is set in faillock.conf"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "sed -i 's/^#even_deny_root/even_deny_root/' /etc/security/faillock.conf"
+        - "grep -q '^even_deny_root' /etc/security/faillock.conf || echo 'even_deny_root' >> /etc/security/faillock.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable even_deny_root in faillock.conf"
+    rollback:
+      commands:
+        - "sed -i '/^even_deny_root/d' /etc/security/faillock.conf"
+      description: "Remove even_deny_root configuration"

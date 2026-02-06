@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269152"
+title: "AlmaLinux OS 9 must log username information when unsuccessful logon attempts occur."
+stig_id: "ALMA-09-008050"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000044
+srg: SRG-OS-000021-GPOS-00005
+
+rationale: |
+  Logging username information during failed login attempts allows administrators to investigate potential attacks.
+  The 'audit' option in faillock.conf enables this logging.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^audit", "/etc/security/faillock.conf"]
+      expected_state: "present"
+      expected_value: "audit"
+      description: "Verify audit option is set in faillock.conf"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "sed -i 's/^#audit/audit/' /etc/security/faillock.conf"
+        - "grep -q '^audit' /etc/security/faillock.conf || echo 'audit' >> /etc/security/faillock.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable audit option in faillock.conf"
+    rollback:
+      commands:
+        - "sed -i '/^audit/d' /etc/security/faillock.conf"
+      description: "Remove audit option from faillock.conf"

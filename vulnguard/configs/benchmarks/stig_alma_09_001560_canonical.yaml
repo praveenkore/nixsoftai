@@ -1,0 +1,57 @@
+benchmark: STIG
+id: "V-269107"
+title: "AlmaLinux OS 9 must prevent a user from overriding the session lock-delay setting for the graphical user interface."
+stig_id: "ALMA-09-001560"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000057
+srg: SRG-OS-000029-GPOS-00010
+
+rationale: |
+  A session time-out lock is a temporary action taken when a user stops work and moves away.
+  Users should not be allowed to change session settings to increase the delay before locking.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "/org/gnome/desktop/screensaver/lock-delay", "/etc/dconf/db/local.d/locks/"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/desktop/screensaver/lock-delay"
+      description: "Verify 'lock-delay' is locked in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/desktop/screensaver/lock-delay' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock the 'lock-delay' setting in dconf"
+    rollback:
+      commands:
+        - "sed -i '|/org/gnome/desktop/screensaver/lock-delay|d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Unlock the 'lock-delay' setting"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "/org/gnome/desktop/screensaver/lock-delay", "/etc/dconf/db/local.d/locks/"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/desktop/screensaver/lock-delay"
+      description: "Verify 'lock-delay' is locked in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/desktop/screensaver/lock-delay' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock the 'lock-delay' setting in dconf"
+    rollback:
+      commands:
+        - "sed -i '|/org/gnome/desktop/screensaver/lock-delay|d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Unlock the 'lock-delay' setting"

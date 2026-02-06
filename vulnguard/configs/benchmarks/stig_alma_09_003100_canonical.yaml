@@ -1,0 +1,37 @@
+benchmark: STIG
+id: "V-269114"
+title: "AlmaLinux OS 9 must implement DOD-approved encryption ciphers to protect the confidentiality of SSH client connections."
+stig_id: "ALMA-09-003100"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  Without cryptographic integrity protections, information can be altered by unauthorized users
+  without detection. AlmaLinux OS 9 incorporates systemwide crypto policies by default. The SSH
+  configuration file has no effect on the ciphers, MACs, or algorithms unless specifically defined
+  in the /etc/sysconfig/sshd file.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: file
+      path: "/etc/ssh/sshd_config"
+      pattern: "Include /etc/crypto-policies/back-ends/opensshserver.config"
+      expected_state: "exists"
+      description: "Verify crypto policies are included in SSH daemon config"
+    remediation:
+      commands:
+        - "grep -q 'Include /etc/ssh/sshd_config.d/\\*.conf' /etc/ssh/sshd_config || echo 'Include /etc/ssh/sshd_config.d/*.conf' >> /etc/ssh/sshd_config"
+        - "grep -q 'Include /etc/crypto-policies/back-ends/opensshserver.config' /etc/ssh/sshd_config.d/50-redhat.conf 2>/dev/null || echo 'Include /etc/crypto-policies/back-ends/opensshserver.config' > /etc/ssh/sshd_config.d/50-redhat.conf"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure SSH daemon to use systemwide crypto policies"
+      service_restart: "sshd"
+    rollback:
+      commands:
+        - "sed -i '/Include \\/etc\\/crypto-policies\\/back-ends\\/opensshserver.config/d' /etc/ssh/sshd_config.d/50-redhat.conf"
+      description: "Remove crypto policy include from SSH config"
+      service_restart: "sshd"

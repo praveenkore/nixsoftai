@@ -1,0 +1,40 @@
+benchmark: STIG
+id: "V-269252"
+title: "AlmaLinux OS 9 must be configured to prevent unrestricted mail relaying."
+stig_id: "ALMA-09-019490"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269252"
+
+rationale: |
+  If unrestricted mail relaying is permitted, unauthorized senders could use this host as a mail relay for the purpose of sending spam or other unauthorized activity.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        if ! command -v postconf >/dev/null 2>&1; then
+          exit 0 # Not Applicable if postfix not installed
+        fi
+        if postconf -n smtpd_client_restrictions | grep -q "permit_mynetworks,reject"; then
+           exit 0
+        fi
+        exit 1
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify postfix smtpd_client_restrictions"
+    remediation:
+      commands:
+        - "postconf -e 'smtpd_client_restrictions = permit_mynetworks,reject'"
+      requires_restart: true
+      requires_reboot: false
+      description: "Restricting mail relaying in postfix"
+    rollback:
+      commands:
+        - "# Manual rollback required (restore previous postfix config)"
+      description: "Manual rollback required"

@@ -98,6 +98,16 @@
 16. **types-PyYAML >= 6.0.0**
     - Purpose: Type stubs for PyYAML
     - Usage: Type checking PyYAML usage
+
+### Canonical Rule Format (v1.2.0+)
+    - **New Feature:** OS family-based canonical rule format
+    - **Purpose:** Single rule file supports multiple Linux distributions
+    - **OS Families:** rhel_family (rhel, centos, almalinux, rocky), debian_family (debian, ubuntu)
+    - **Key Implementation:**
+      - `implementations` map with OS family keys
+      - OS family selection in scanner
+      - Backward compatible with legacy format
+    - **Documentation:** `vulnguard/configs/benchmarks/CANONICAL_RULES_GUIDE.md`
     - Key Features: Complete type annotations
 
 17. **types-psutil >= 5.9.0**
@@ -143,7 +153,7 @@ The following dependencies are optional and only required for local LLM support:
 - Python 3.8 or higher
 - Git
 - Virtual environment (recommended)
-- Linux development environment (RHEL 8+, Ubuntu 20.04+, CentOS 8+, Debian 10+)
+- Linux development environment (RHEL 8+, Ubuntu 20.04+, CentOS 8+, Debian 10+, AlmaLinux 8+, Rocky Linux 8+)
 
 ### Installation Steps
 
@@ -217,8 +227,10 @@ python -m vulnguard.main version
 - **Supported Linux Distributions**:
   - Red Hat Enterprise Linux (RHEL) 8+
   - Ubuntu 20.04+
-  - CentOS 8+
+  - CentOS 8+ (including CentOS Stream)
   - Debian 10+
+  - AlmaLinux 8+ (NEW)
+  - Rocky Linux 8+ (NEW)
 
 ### Security Constraints
 
@@ -472,6 +484,14 @@ All AI output is validated:
 - Confidence threshold checking
 - Required field verification
 
+### TLS Certificate Pinning
+
+For enhanced security when communicating with C2 servers:
+- **Certificate fingerprint**: SHA-256 fingerprint of expected server certificate
+- **Pinning verification**: SSL context wrapper validates certificate fingerprints
+- **Failure handling**: `GatewaySecurityError` raised on pinning failure
+- **Configuration**: Optional parameter in `GatewayClient` constructor
+
 ## Performance Considerations
 
 ### Scanning Performance
@@ -482,16 +502,18 @@ All AI output is validated:
 
 ### LLM Request Performance
 
-- **Connection pooling**: Reuses HTTP connections
+- **Connection pooling**: Reuses HTTP connections with automatic cleanup (idle: 5min, max lifetime: 1hr)
 - **Rate limiting**: Prevents API quota exhaustion
 - **Retry logic**: Exponential backoff for resilience
 - **Timeout handling**: Prevents hanging requests
+- **Batch processing**: Concurrent AI advisory generation
 
 ### Memory Management
 
 - **Lazy loading**: Avoids circular dependencies
 - **Efficient data structures**: Minimizes memory footprint
 - **Log rotation**: Prevents disk space issues
+- **Resource cleanup**: Background thread for HTTP client pool eviction
 
 ## Best Practices
 

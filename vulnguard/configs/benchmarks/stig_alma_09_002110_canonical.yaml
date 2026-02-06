@@ -1,0 +1,57 @@
+benchmark: STIG
+id: "V-269110"
+title: "AlmaLinux OS 9 must prevent a user from overriding the disabling of the graphical user smart card removal action."
+stig_id: "ALMA-09-002110"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000056
+srg: SRG-OS-000028-GPOS-00009
+
+rationale: |
+  The session lock enforced by smart card removal must not be overridable by users.
+  Allowing users to change this setting negates the security control.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "/org/gnome/settings-daemon/peripherals/smartcard/removal-action", "/etc/dconf/db/local.d/locks/"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/settings-daemon/peripherals/smartcard/removal-action"
+      description: "Verify 'removal-action' is locked in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/settings-daemon/peripherals/smartcard/removal-action' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock the smart card removal action setting"
+    rollback:
+      commands:
+        - "sed -i '|/org/gnome/settings-daemon/peripherals/smartcard/removal-action|d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Unlock the smart card removal action setting"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "/org/gnome/settings-daemon/peripherals/smartcard/removal-action", "/etc/dconf/db/local.d/locks/"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/settings-daemon/peripherals/smartcard/removal-action"
+      description: "Verify 'removal-action' is locked in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/settings-daemon/peripherals/smartcard/removal-action' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock the smart card removal action setting"
+    rollback:
+      commands:
+        - "sed -i '|/org/gnome/settings-daemon/peripherals/smartcard/removal-action|d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Unlock the smart card removal action setting"

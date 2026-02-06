@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269279"
+title: "AlmaLinux OS 9 must disable the ability of a user to restart the system from the login screen."
+stig_id: "ALMA-09-022460"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269279"
+
+rationale: |
+  A user who is at the console can reboot the system at the login screen. If restart or shutdown buttons are pressed at the login screen, this can create the risk of short-term loss of availability of systems due to reboot.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        if ! command -v dconf >/dev/null 2>&1; then exit 0; fi # Not Applicable
+        grep -R "disable-restart-buttons" /etc/dconf/db/* | grep -q "true"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify disable-restart-buttons is set to true in dconf"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "printf \"[org/gnome/login-screen]\\ndisable-restart-buttons=true\\n\" > /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set disable-restart-buttons to true in dconf"
+    rollback:
+      commands:
+        - "sed -i '/disable-restart-buttons=true/d' /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      description: "Enable restart buttons in dconf"

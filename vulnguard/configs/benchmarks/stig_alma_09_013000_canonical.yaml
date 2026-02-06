@@ -1,0 +1,48 @@
+benchmark: STIG
+id: "V-269194"
+title: "AlmaLinux OS 9 /etc/group file must be group owned by root."
+stig_id: "ALMA-09-013000"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  The /etc/group file contains group definitions. It must be protected.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G", "/etc/group"]
+      expected_state: "exact"
+      expected_value: "root"
+      description: "Verify /etc/group is group-owned by root"
+    remediation:
+      commands:
+        - "chgrp root /etc/group"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set group ownership of /etc/group to root"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G", "/etc/group"]
+      expected_state: "exact"
+      expected_value: "root"
+      description: "Verify /etc/group is group-owned by root"
+    remediation:
+      commands:
+        - "chgrp root /etc/group"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set group ownership of /etc/group to root"
+    rollback:
+      commands: []
+      description: "Manual rollback"

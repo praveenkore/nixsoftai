@@ -1,0 +1,52 @@
+# VulnGuard Canonical STIG Rule V-230263
+# Refactored for multi-distribution support
+# SELinux auditing daemon must be installed and active
+
+benchmark: STIG
+id: "V-230263"
+title: "The operating system must install and enable the SELinux auditing daemon."
+original_severity: "CAT II"
+severity: high
+rationale: >
+  The SELinux auditing daemon (auditd) provides comprehensive logging of 
+  security-relevant events on the system. When auditd is running and 
+  configured properly, it logs SELinux denials, policy changes, and 
+  other security events that are critical for forensic analysis and compliance 
+  monitoring.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      parameter: ["rpm", "-q", "auditd"]
+      expected_state: "package auditd is installed"
+      expected_type: string
+    remediation:
+      commands:
+        - "yum install -y audit"
+      requires_restart: false
+      requires_reboot: false
+    rollback:
+      commands:
+        - "yum remove -y audit"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      parameter: ["dpkg", "-l", "|", "grep", "-q", "^ii  auditd"]
+      expected_state: "package auditd is installed"
+      expected_type: string
+    remediation:
+      commands:
+        - "apt-get install -y auditd"
+      requires_restart: false
+      requires_reboot: false
+    rollback:
+      commands:
+        - "apt-get remove -y auditd"
+
+approval_required: true
+exception_allowed: false
+ai_assist: false

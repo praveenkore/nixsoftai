@@ -1,0 +1,74 @@
+benchmark: STIG
+id: "V-269215"
+title: "All AlmaLinux OS 9 local interactive user home directories must have mode 0750 or less permissive."
+stig_id: "ALMA-09-015310"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00230
+vulnerability_id: "V-269215"
+
+rationale: |
+  Excessive permissions on local interactive user home directories may allow unauthorized access to user files by other users.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        for user in $(awk -F: '($3>=1000)&&($7 !~ /nologin/){print $1}' /etc/passwd); do
+          dir=$(getent passwd "$user" | cut -d: -f6)
+          if [ -d "$dir" ]; then
+            mode=$(stat -c "%a" "$dir")
+            # Check if mode is more permissive than 750.
+            # Simple check: if group write/exec or other read/write/exec bits are set inappropriately.
+            # Ideally 750 = rwxr-x---
+            # We fail if group has w (2) or other has r(4) w(2) x(1).
+            # Using bash bitwise logic or stat parsing?
+            # Easiest: use find or similar, or python logic.
+            # STIG check command just lists them.
+            if [ "$mode" -gt 750 ]; then
+                # This numeric comparison isn't perfect for octal but 750 is the limit.
+                # Actually, 755 is > 750 but often default. STIG says 0750 or LESS permissive.
+                # 755 is MORE permissive (group read/exec, OTHER read/exec).
+                # So 750 is strict.
+                echo "User $user home $dir has mode $mode"
+                exit 1
+            fi
+            # Better check: check 'other' bits
+            other=${mode:2:1}
+            if [ "$other" -ne 0 ]; then
+                 echo "User $user home $dir has mode $mode (other access)"
+                 exit 1
+            fi
+             # Check group write
+            group=${mode:1:1}
+            # group can be 0, 1(x), 4(r), 5(rx). Cannot be 2(w), 3(wx), 6(rw), 7(rwx)
+            if [[ "$group" =~ [2367] ]]; then
+                 echo "User $user home $dir has mode $mode (group write)"
+                 exit 1
+            fi
+          fi
+        done
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify home directories have mode 0750 or less permissive"
+    remediation:
+      commands:
+        - |
+          for user in $(awk -F: '($3>=1000)&&($7 !~ /nologin/){print $1}' /etc/passwd); do
+             dir=$(getent passwd "$user" | cut -d: -f6)
+             if [ -d "$dir" ]; then
+               chmod 0750 "$dir"
+             fi
+          done
+      requires_restart: false
+      requires_reboot: false
+      description: "Set home directory permissions to 0750"
+    rollback:
+      commands:
+        - "# Manual rollback required - might need to restore to 0700 or 0755 depending on policy"
+      description: "Manual rollback required"

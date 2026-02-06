@@ -1,0 +1,40 @@
+benchmark: STIG
+id: "V-269209"
+title: "All AlmaLinux OS 9 local interactive user home directories defined in the /etc/passwd file must exist."
+stig_id: "ALMA-09-014650"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00230
+vulnerability_id: "V-269209"
+
+rationale: |
+  If a local interactive user has a home directory defined that does not exist, the user may be given access to the / directory as the current working directory upon logon.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["pwck", "-r"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify that all user home directories exist using pwck"
+    remediation:
+      commands:
+        - |
+          for user in $(awk -F: '($3>=1000)&&($7 !~ /nologin/){print $1}' /etc/passwd); do
+            dir=$(getent passwd "$user" | cut -d: -f6)
+            if [ ! -d "$dir" ]; then
+              mkdir -p "$dir"
+              chown "$user" "$dir"
+              chmod 0700 "$dir"
+            fi
+          done
+      requires_restart: false
+      requires_reboot: false
+      description: "Create missing home directories for interactive users"
+    rollback:
+      commands:
+        - "# Manual rollback required - delete created directories if necessary"
+      description: "Manual rollback required"

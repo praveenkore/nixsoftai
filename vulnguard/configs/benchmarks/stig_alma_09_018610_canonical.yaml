@@ -1,0 +1,40 @@
+benchmark: STIG
+id: "V-269244"
+title: "AlmaLinux OS 9 must ignore Internet Control Message Protocol (ICMP) redirect messages."
+stig_id: "ALMA-09-018610"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269244"
+
+rationale: |
+  ICMP redirect messages are used by routers to inform hosts that a more direct route exists for a particular destination. These messages modify the host's route table and are unauthenticated. An illicit ICMP redirect message could result in a man-in-the-middle attack.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "-a"]
+      script: |
+        sysctl -a | grep accept_redirects | awk '{if ($3 != 0) exit 1}'
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify all accept_redirects sysctl values are 0"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.conf.all.accept_redirects = 0' > /etc/sysctl.d/99-stig-icmp-redirects.conf"
+        - "echo 'net.ipv4.conf.default.accept_redirects = 0' >> /etc/sysctl.d/99-stig-icmp-redirects.conf"
+        - "echo 'net.ipv6.conf.all.accept_redirects = 0' >> /etc/sysctl.d/99-stig-icmp-redirects.conf"
+        - "echo 'net.ipv6.conf.default.accept_redirects = 0' >> /etc/sysctl.d/99-stig-icmp-redirects.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable ICMP redirects via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-icmp-redirects.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

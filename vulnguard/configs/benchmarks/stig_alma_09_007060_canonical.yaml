@@ -1,0 +1,53 @@
+benchmark: STIG
+id: "V-269144"
+title: "AlmaLinux OS 9 must enable kernel parameters to enforce discretionary access control on hardlinks."
+stig_id: "ALMA-09-007060"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002235
+srg: SRG-OS-000324-GPOS-00125
+
+rationale: |
+  Enabling protected_hardlinks prevents users from creating hardlinks to files they do not own.
+  This mitigates vulnerabilities related to insecure file manipulation by privileged programs.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: sysctl
+      key: "fs.protected_hardlinks"
+      expected_value: "1"
+      description: "Verify fs.protected_hardlinks is set to 1"
+    remediation:
+      commands:
+        - "echo 'fs.protected_hardlinks = 1' > /etc/sysctl.d/60-hardlinks.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable protected hardlinks kernel parameter"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/60-hardlinks.conf"
+        - "sysctl -w fs.protected_hardlinks=0"
+      description: "Disable protected hardlinks"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: sysctl
+      key: "fs.protected_hardlinks"
+      expected_value: "1"
+      description: "Verify fs.protected_hardlinks is set to 1"
+    remediation:
+      commands:
+        - "echo 'fs.protected_hardlinks = 1' > /etc/sysctl.d/60-hardlinks.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable protected hardlinks kernel parameter"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/60-hardlinks.conf"
+        - "sysctl -w fs.protected_hardlinks=0"
+      description: "Disable protected hardlinks"

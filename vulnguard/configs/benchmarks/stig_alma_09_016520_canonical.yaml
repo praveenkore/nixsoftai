@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269225"
+title: "AlmaLinux OS 9 /etc/passwd file must have mode 0644 or less permissive to prevent unauthorized access."
+stig_id: "ALMA-09-016520"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269225"
+
+rationale: |
+  If the "/etc/passwd" file is writable by a group-owner or the world the risk of its compromise is increased. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%#a %n", "/etc/passwd"]
+      expected_state: "regex"
+      expected_value: "^0(644|640|600|444|400) /etc/passwd$"
+      description: "Verify that /etc/passwd has mode 0644 or less permissive"
+    remediation:
+      commands:
+        - "chmod 0644 /etc/passwd"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode of /etc/passwd to 0644"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert permissions change"

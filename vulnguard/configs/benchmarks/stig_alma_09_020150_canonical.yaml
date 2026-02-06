@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269258"
+title: "There must be no shosts.equiv files on AlmaLinux OS 9."
+stig_id: "ALMA-09-020150"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269258"
+
+rationale: |
+  The shosts.equiv files are used to configure host-based authentication. This is not sufficient for preventing unauthorized access.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "/", "-name", "shosts.equiv"]
+      expected_state: "exact"
+      expected_value: ""
+      description: "Verify no shosts.equiv files exist"
+    remediation:
+      commands:
+        - "find / -name shosts.equiv -delete"
+      requires_restart: false
+      requires_reboot: false
+      description: "Delete shosts.equiv files"
+    rollback:
+      commands:
+        - "# Manual rollback: Restore files if needed"
+      description: "Manual rollback required"

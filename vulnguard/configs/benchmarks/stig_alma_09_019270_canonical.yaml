@@ -1,0 +1,39 @@
+benchmark: STIG
+id: "V-269250"
+title: "AlmaLinux OS 9 must not have unauthorized IP tunnels configured."
+stig_id: "ALMA-09-019270"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269250"
+
+rationale: |
+  IP tunneling mechanisms can be used to bypass network filtering. If tunneling is required, it must be documented with the information system security officer (ISSO).
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        if systemctl is-active ipsec; then
+          if grep -ri "conn" /etc/ipsec.conf /etc/ipsec.d/ | grep -v '#'; then
+             exit 1 # IPsec tunnels found
+          fi
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify no unauthorized IPsec tunnels are active"
+    remediation:
+      commands:
+        - "# Manual remediation required: Remove or document unapproved IP tunnels."
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation required"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269255"
+title: "AlmaLinux OS 9 must use reverse path filtering on all IP interfaces."
+stig_id: "ALMA-09-019820"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269255"
+
+rationale: |
+  Enabling reverse path filtering drops packets with source addresses that should not have been able to be received on the interface on which they were received.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "-a"]
+      script: |
+        sysctl -a | grep rp_filter | awk '{if ($3 != 1) exit 1}'
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify rp_filter is 1 for all interfaces"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.conf.all.rp_filter = 1' > /etc/sysctl.d/99-stig-rp-filter.conf"
+        - "echo 'net.ipv4.conf.default.rp_filter = 1' >> /etc/sysctl.d/99-stig-rp-filter.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable reverse path filtering via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-rp-filter.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

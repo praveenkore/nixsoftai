@@ -1,0 +1,60 @@
+benchmark: STIG
+id: "V-269106"
+title: "AlmaLinux OS 9 must initiate a session lock for graphical user interfaces when the screensaver is activated."
+stig_id: "ALMA-09-001450"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000057
+srg: SRG-OS-000029-GPOS-00010
+
+rationale: |
+  A session lock is a temporary action taken when a user stops work and moves away from the immediate
+  physical vicinity of the information system. The system must initiate a lock when the screensaver
+  is activated to ensure the system is protected during the user's absence.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "lock-delay=uint32", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "lock-delay=uint32 5"
+      description: "Verify lock-delay is set to 5 seconds or less in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/desktop/screensaver]' >> /etc/dconf/db/local.d/00-screensaver"
+        - "echo 'lock-delay=uint32 5' >> /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure system to lock within 5 seconds of screensaver activation"
+    rollback:
+      commands:
+        - "sed -i '/lock-delay=uint32 5/d' /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      description: "Remove lock-delay configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "lock-delay=uint32", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "lock-delay=uint32 5"
+      description: "Verify lock-delay is set to 5 seconds or less in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/desktop/screensaver]' >> /etc/dconf/db/local.d/00-screensaver"
+        - "echo 'lock-delay=uint32 5' >> /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure system to lock within 5 seconds of screensaver activation"
+    rollback:
+      commands:
+        - "sed -i '/lock-delay=uint32 5/d' /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      description: "Remove lock-delay configuration"

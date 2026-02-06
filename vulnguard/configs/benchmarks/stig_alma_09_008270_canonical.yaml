@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269154"
+title: "AlmaLinux OS 9 must ensure account locks persist across reboots."
+stig_id: "ALMA-09-008270"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002238
+srg: SRG-OS-000329-GPOS-00128
+
+rationale: |
+  By default, faillock might store data in /var/run which is cleared on reboot.
+  Using /var/log/faillock ensures lock state persists across system restarts.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^dir =", "/etc/security/faillock.conf"]
+      expected_state: "contains"
+      expected_value: "dir = /var/log/faillock"
+      description: "Verify dir is set to /var/log/faillock in faillock.conf"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "mkdir -p /var/log/faillock"
+        - "sed -i 's|^#dir =.*|dir = /var/log/faillock|' /etc/security/faillock.conf"
+        - "sed -i 's|^dir =.*|dir = /var/log/faillock|' /etc/security/faillock.conf"
+        - "grep -q '^dir = /var/log/faillock' /etc/security/faillock.conf || echo 'dir = /var/log/faillock' >> /etc/security/faillock.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set faillock dir to /var/log/faillock"
+    rollback:
+      commands:
+        - "sed -i '|^dir = /var/log/faillock|d' /etc/security/faillock.conf"
+      description: "Remove custom faillock dir configuration"

@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269123"
+title: "AlmaLinux OS 9 must implement DOD-approved encryption in the OpenSSL package."
+stig_id: "ALMA-09-003980"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  OpenSSL must rely on the system-wide crypto policies to ensure FIPS-approved algorithms are used.
+  This prevents the use of weak ciphers and ensures compliance.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", ".include = /etc/crypto-policies/back-ends/opensslcnf.config", "/etc/pki/tls/openssl.cnf"]
+      expected_state: "contains"
+      expected_value: ".include = /etc/crypto-policies/back-ends/opensslcnf.config"
+      description: "Verify OpenSSL includes system crypto policy"
+    remediation:
+      commands:
+        - "echo '.include = /etc/crypto-policies/back-ends/opensslcnf.config' >> /etc/pki/tls/openssl.cnf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure OpenSSL to include system crypto policy"
+    rollback:
+      commands:
+        - "sed -i '|.include = /etc/crypto-policies/back-ends/opensslcnf.config|d' /etc/pki/tls/openssl.cnf"
+      description: "Remove system crypto policy include from OpenSSL config"

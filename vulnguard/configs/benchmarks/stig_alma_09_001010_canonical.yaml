@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269102"
+title: "AlmaLinux OS 9 must limit the number of concurrent sessions to ten for all accounts and/or account types."
+stig_id: "ALMA-09-001010"
+original_severity: "CAT III"
+severity: low
+cci: CCI-000054
+srg: SRG-OS-000027-GPOS-00008
+
+rationale: |
+  Operating system management includes the ability to control the number of users and user sessions
+  that use an operating system. Limiting the number of allowed users and sessions per user is helpful
+  in reducing the risks related to denial-of-service (DoS) attacks.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-rs", "maxlogins", "/etc/security/limits.conf", "/etc/security/limits.d/*.conf"]
+      expected_state: "contains"
+      expected_value: "* hard maxlogins 10"
+      description: "Verify maxlogins is set to 10 in limits configuration"
+    remediation:
+      commands:
+        - "echo '* hard maxlogins 10' >> /etc/security/limits.d/maxlogins.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Add maxlogins limit of 10 to limits configuration"
+    rollback:
+      commands:
+        - "sed -i '/maxlogins/d' /etc/security/limits.d/maxlogins.conf"
+      description: "Remove maxlogins configuration"

@@ -3,8 +3,14 @@ id: "V-230275"
 title: "The SSH daemon must not permit root logins."
 severity: critical
 original_severity: "CAT I"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Permitting root login via SSH increases the attack surface and allows direct access to privileged accounts."
 check:
   type: file

@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269208"
+title: "All AlmaLinux OS 9 local interactive user accounts must be assigned a home directory upon creation."
+stig_id: "ALMA-09-014540"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00230
+vulnerability_id: "V-269208"
+
+rationale: |
+  If local interactive users are not assigned a valid home directory, there is no place for the storage and control of files they should own.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^CREATE_HOME", "/etc/login.defs"]
+      expected_state: "contains"
+      expected_value: "yes"
+      description: "Verify that CREATE_HOME is set to yes in /etc/login.defs"
+    remediation:
+      commands:
+        - "sed -i 's/^CREATE_HOME.*/CREATE_HOME yes/' /etc/login.defs"
+        - "grep -q '^CREATE_HOME' /etc/login.defs || echo 'CREATE_HOME yes' >> /etc/login.defs"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set CREATE_HOME to yes in /etc/login.defs"
+    rollback:
+      commands:
+        - "sed -i 's/^CREATE_HOME yes/CREATE_HOME no/' /etc/login.defs"
+      description: "Revert CREATE_HOME setting"

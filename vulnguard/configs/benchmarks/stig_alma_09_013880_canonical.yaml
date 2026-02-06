@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269202"
+title: "AlmaLinux OS 9 /etc/gshadow- file must have mode 0000 or less permissive."
+stig_id: "ALMA-09-013880"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269202"
+
+rationale: |
+  The "/etc/gshadow-" file is a backup of "/etc/gshadow", and as such, contains group password hashes. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a %n", "/etc/gshadow-"]
+      expected_state: "contains"
+      expected_value: "0 /etc/gshadow-"
+      description: "Verify that /etc/gshadow- has mode 0000"
+    remediation:
+      commands:
+        - "chmod 0000 /etc/gshadow-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode of /etc/gshadow- to 0000"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert permissions change"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a %n", "/etc/gshadow-"]
+      expected_state: "regex"
+      expected_value: "^(640|600|000) /etc/gshadow-$"
+      description: "Verify that /etc/gshadow- has secure permissions (Ubuntu triggers on 640)"
+    remediation:
+      commands:
+        - "chmod 640 /etc/gshadow-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode of /etc/gshadow- to 640"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert permissions change"

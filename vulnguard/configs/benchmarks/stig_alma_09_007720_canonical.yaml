@@ -1,0 +1,35 @@
+benchmark: STIG
+id: "V-269149"
+title: "AlmaLinux OS 9 must automatically lock an account when three unsuccessful logon attempts occur during a 15-minute time period."
+stig_id: "ALMA-09-007720"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000044
+srg: SRG-OS-000021-GPOS-00005
+
+rationale: |
+  Configuring the fail interval ensures that brute force attempts are counted within a specific time window.
+  15 minutes (900 seconds) is the required interval.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^fail_interval =", "/etc/security/faillock.conf"]
+      expected_state: "contains"
+      expected_value: "fail_interval = 900"
+      description: "Verify fail_interval is set to 900 in faillock.conf"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "sed -i 's/^#fail_interval =.*/fail_interval = 900/' /etc/security/faillock.conf"
+        - "sed -i 's/^fail_interval =.*/fail_interval = 900/' /etc/security/faillock.conf"
+        - "grep -q '^fail_interval = 900' /etc/security/faillock.conf || echo 'fail_interval = 900' >> /etc/security/faillock.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure fail_interval=900 in faillock.conf"
+    rollback:
+      commands:
+        - "sed -i '/^fail_interval = 900/d' /etc/security/faillock.conf"
+      description: "Remove fail_interval configuration"

@@ -22,3 +22,7 @@ class GatewayAuthenticationError(GatewayError):
 class GatewayPayloadError(GatewayError):
     """Raised when the payload is malformed or rejected by the server."""
     pass
+
+class GatewaySecurityError(GatewayError):
+    """Raised when a security check fails (e.g., certificate pinning)."""
+    pass

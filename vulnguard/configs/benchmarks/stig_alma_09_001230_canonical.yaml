@@ -1,0 +1,65 @@
+benchmark: STIG
+id: "V-269104"
+title: "AlmaLinux OS 9 must conceal, via the session lock, information previously visible on the display with a publicly viewable image."
+stig_id: "ALMA-09-001230"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000060
+srg: SRG-OS-000031-GPOS-00012
+
+rationale: |
+  Setting the screensaver mode to blank-only conceals the contents of the display from passersby.
+  Publicly viewable images can include static or dynamic images, for example, patterns used with screen savers,
+  photographic images, solid colors, a clock, a battery life indicator, or a blank screen, with the additional
+  caveat that none of the images convey sensitive information.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "picture-uri=''", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "picture-uri=''"
+      description: "Verify screensaver picture-uri is set to blank ('') in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '[org/gnome/desktop/screensaver]' >> /etc/dconf/db/local.d/00-security-settings"
+        - "echo \"picture-uri=''\" >> /etc/dconf/db/local.d/00-security-settings"
+        - "echo '/org/gnome/desktop/screensaver/picture-uri' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure screensaver to be blank and lock the setting"
+    rollback:
+      commands:
+        - "sed -i \"/picture-uri=''/d\" /etc/dconf/db/local.d/00-security-settings"
+        - "sed -i '/\\/org\\/gnome\\/desktop\\/screensaver\\/picture-uri/d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Remove screensaver picture-uri configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "picture-uri=''", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "picture-uri=''"
+      description: "Verify screensaver picture-uri is set to blank ('') in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '[org/gnome/desktop/screensaver]' >> /etc/dconf/db/local.d/00-security-settings"
+        - "echo \"picture-uri=''\" >> /etc/dconf/db/local.d/00-security-settings"
+        - "echo '/org/gnome/desktop/screensaver/picture-uri' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure screensaver to be blank and lock the setting"
+    rollback:
+      commands:
+        - "sed -i \"/picture-uri=''/d\" /etc/dconf/db/local.d/00-security-settings"
+        - "sed -i '/\\/org\\/gnome\\/desktop\\/screensaver\\/picture-uri/d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Remove screensaver picture-uri configuration"

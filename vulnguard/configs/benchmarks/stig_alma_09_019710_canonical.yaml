@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269254"
+title: "AlmaLinux OS 9 network interfaces must not be in promiscuous mode."
+stig_id: "ALMA-09-019710"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269254"
+
+rationale: |
+  Network interfaces in promiscuous mode allow for the capture of all network traffic visible to the system. This allows unauthorized individuals to collect information.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        ip link | grep -i promisc
+        if [ $? -eq 0 ]; then
+          exit 1 # Promiscuous mode detected
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify no network interfaces are in promiscuous mode"
+    remediation:
+      commands:
+        - "# Manual remediation: 'ip link set dev <dev> promisc off'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable promiscuous mode manually"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

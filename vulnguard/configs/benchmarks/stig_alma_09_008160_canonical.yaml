@@ -1,0 +1,35 @@
+benchmark: STIG
+id: "V-269153"
+title: "AlmaLinux OS 9 must maintain an account lock until the locked account is manually released by an administrator; and not automatically after a set time."
+stig_id: "ALMA-09-008160"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002238
+srg: SRG-OS-000329-GPOS-00128
+
+rationale: |
+  Setting unlock_time to 0 ensures that locked accounts require manual intervention to unlock,
+  preventing attackers from simply waiting for the lock to expire.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^unlock_time =", "/etc/security/faillock.conf"]
+      expected_state: "contains"
+      expected_value: "unlock_time = 0"
+      description: "Verify unlock_time is set to 0 in faillock.conf"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "sed -i 's/^#unlock_time =.*/unlock_time = 0/' /etc/security/faillock.conf"
+        - "sed -i 's/^unlock_time =.*/unlock_time = 0/' /etc/security/faillock.conf"
+        - "grep -q '^unlock_time = 0' /etc/security/faillock.conf || echo 'unlock_time = 0' >> /etc/security/faillock.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set unlock_time=0 in faillock.conf"
+    rollback:
+      commands:
+        - "sed -i '/^unlock_time = 0/d' /etc/security/faillock.conf"
+      description: "Remove unlock_time configuration"

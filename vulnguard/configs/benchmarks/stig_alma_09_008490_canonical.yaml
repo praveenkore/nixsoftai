@@ -1,0 +1,35 @@
+benchmark: STIG
+id: "V-269156"
+title: "AlmaLinux OS 9 must prevent users from disabling the Standard Mandatory DOD Notice and Consent Banner for graphical user interfaces."
+stig_id: "ALMA-09-008490"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000048
+srg: SRG-OS-000023-GPOS-00006
+
+rationale: |
+  Mandatory login banners must be displayed and not circumventable by users.
+  Locking the dconf setting prevents user override.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "banner-message-enable", "/etc/dconf/db/local.d/locks/*"]
+      expected_state: "contains"
+      expected_value: "banner-message-enable"
+      description: "Verify banner-message-enable is locked"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/login-screen/banner-message-enable' >> /etc/dconf/db/local.d/locks/00-banner"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock banner-message-enable dconf setting"
+    rollback:
+      commands:
+        - "rm -f /etc/dconf/db/local.d/locks/00-banner"
+        - "dconf update"
+      description: "Remove dconf lock"

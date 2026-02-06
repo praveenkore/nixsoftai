@@ -26,6 +26,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -690,6 +691,10 @@ class RemediationEngine:
         evaluation_lookup = {r.rule_id: r for r in evaluation_results}
         
         for scan_result in scan_results:
+            # Skip not_applicable rules - they didn't run and don't need remediation
+            if getattr(scan_result, 'applicability', 'applicable') == 'not_applicable':
+                continue
+                
             # Safe lookup for evaluation result
             eval_result = evaluation_lookup.get(scan_result.rule_id)
             
@@ -727,15 +732,27 @@ class RemediationEngine:
                 
             backups = []
             for item in self.backup_directory.iterdir():
-                if item.is_dir() and item.name.startswith("backup_") or (item.is_dir() and "_20" in item.name):
-                     # Match our patterns like rule_1_20260201 or backup_ prefixes
-                    backups.append(item)
+                # Must be a directory AND match either backup pattern
+                if item.is_dir() and (item.name.startswith("backup_") or "_20" in item.name):
+                    # Verify path is still within backup directory (prevent traversal)
+                    try:
+                        item_resolved = item.resolve()
+                        backup_resolved = self.backup_directory.resolve()
+                        if str(item_resolved).startswith(str(backup_resolved)):
+                            backups.append(item)
+                        else:
+                            self.logger.log_warning(
+                                f"Skipping backup entry outside backup directory: {item}"
+                            )
+                    except (OSError, ValueError) as e:
+                        self.logger.log_warning(
+                            f"Could not resolve backup path {item}: {e}"
+                        )
             
             # Sort by modification time (oldest first)
             backups.sort(key=lambda x: x.stat().st_mtime)
             
             # Check retention days
-            import time
             current_time = time.time()
             retention_seconds = self.backup_retention_days * 86400
             
@@ -746,6 +763,15 @@ class RemediationEngine:
                 age = current_time - backup.stat().st_mtime
                 if age > retention_seconds:
                     try:
+                        # Safety check: verify backup is still within backup directory
+                        backup_resolved = backup.resolve()
+                        backup_dir_resolved = self.backup_directory.resolve()
+                        if not str(backup_resolved).startswith(str(backup_dir_resolved)):
+                            self.logger.log_error(
+                                "backup_cleanup",
+                                f"Path traversal detected, skipping deletion: {backup}"
+                            )
+                            continue
                         shutil.rmtree(backup)
                         deleted_count += 1
                         self.logger.log_info(
@@ -765,6 +791,15 @@ class RemediationEngine:
                 for i in range(excess):
                     backup = remaining_backups[i]
                     try:
+                        # Safety check: verify backup is still within backup directory
+                        backup_resolved = backup.resolve()
+                        backup_dir_resolved = self.backup_directory.resolve()
+                        if not str(backup_resolved).startswith(str(backup_dir_resolved)):
+                            self.logger.log_error(
+                                "backup_cleanup",
+                                f"Path traversal detected, skipping deletion: {backup}"
+                            )
+                            continue
                         shutil.rmtree(backup)
                         deleted_count += 1
                         self.logger.log_info(

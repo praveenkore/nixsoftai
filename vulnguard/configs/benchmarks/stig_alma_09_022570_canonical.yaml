@@ -1,0 +1,43 @@
+benchmark: STIG
+id: "V-269280"
+title: "AlmaLinux OS 9 must prevent a user from overriding the disable-restart-buttons setting for the graphical user interface."
+stig_id: "ALMA-09-022570"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269280"
+
+rationale: |
+  Locking the disable-restart-buttons setting ensures that users cannot override the security configuration that prevents unauthorized reboots from the login screen.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        if ! command -v dconf >/dev/null 2>&1; then exit 0; fi # Not Applicable
+        # Determine database profile
+        PROFILE=$(grep system-db /etc/dconf/profile/user | cut -d: -f2 | xargs)
+        [ -z "$PROFILE" ] && PROFILE="local"
+        grep -q "disable-restart-buttons" /etc/dconf/db/"$PROFILE".d/locks/*
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify disable-restart-buttons is locked in dconf"
+    remediation:
+      commands:
+        - "PROFILE=$(grep system-db /etc/dconf/profile/user | cut -d: -f2 | xargs); [ -z \"$PROFILE\" ] && PROFILE=\"local\""
+        - "mkdir -p /etc/dconf/db/\"$PROFILE\".d/locks"
+        - "echo '/org/gnome/login-screen/disable-restart-buttons' >> /etc/dconf/db/\"$PROFILE\".d/locks/session"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock disable-restart-buttons in dconf"
+    rollback:
+      commands:
+        - "PROFILE=$(grep system-db /etc/dconf/profile/user | cut -d: -f2 | xargs); [ -z \"$PROFILE\" ] && PROFILE=\"local\""
+        - "sed -i '\\|/org/gnome/login-screen/disable-restart-buttons|d' /etc/dconf/db/\"$PROFILE\".d/locks/session"
+        - "dconf update"
+      description: "Unlock disable-restart-buttons in dconf"

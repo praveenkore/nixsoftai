@@ -3,8 +3,14 @@ id: "V-230279"
 title: "The SSH daemon must ignore .rhosts files."
 severity: medium
 original_severity: "CAT III"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Ignoring .rhosts files prevents authentication based on potentially insecure host-based trust relationships."
 check:
   type: file

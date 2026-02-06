@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269151"
+title: "AlmaLinux OS 9 must configure the use of the pam_faillock.so module in the /etc/pam.d/password-auth file."
+stig_id: "ALMA-09-007940"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000044
+srg: SRG-OS-000021-GPOS-00005
+
+rationale: |
+  The pam_faillock module in password-auth ensures that password-based authentication via SSH and other services
+  enforces account locking on failed attempts.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "pam_faillock.so", "/etc/pam.d/password-auth"]
+      expected_state: "contains"
+      expected_value: "auth required pam_faillock.so preauth"
+      description: "Verify pam_faillock.so is configured in password-auth"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "authselect apply-changes"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable with-faillock feature using authselect"
+    rollback:
+      commands:
+        - "authselect disable-feature with-faillock"
+        - "authselect apply-changes"
+      description: "Disable with-faillock feature"

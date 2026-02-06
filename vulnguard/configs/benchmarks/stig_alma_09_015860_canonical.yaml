@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269219"
+title: "AlmaLinux OS 9 must not have accounts configured with blank or null passwords."
+stig_id: "ALMA-09-015860"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269219"
+
+rationale: |
+  If an account has an empty password, anyone could log in and run commands with the privileges of that account. Accounts with empty passwords should never be used in operational environments.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["awk", "-F:", "!$2 {print $1}", "/etc/shadow"]
+      expected_state: "exact"
+      expected_value: ""
+      description: "Verify no accounts have blank passwords in /etc/shadow"
+    remediation:
+      commands:
+        - "passwd -l $(awk -F: '!$2 {print $1}' /etc/shadow)"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock accounts with blank passwords"
+    rollback:
+      commands:
+        - "# Manual rollback required (unlock accounts)"
+      description: "Manual rollback required"

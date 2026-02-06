@@ -1,0 +1,44 @@
+benchmark: STIG
+id: "V-269274"
+title: "AlmaLinux OS 9 effective dconf policy must match the policy keyfiles."
+stig_id: "ALMA-09-021910"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269274"
+
+rationale: |
+  Unlike text-based keyfiles, the binary database is impossible to check through most automated and all manual means; therefore, to evaluate dconf configuration, both have to be true at the same time—configuration files have to be compliant, and the database needs to be more recent than those keyfiles, which gives confidence that it reflects them.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        if ! command -v dconf >/dev/null 2>&1; then exit 0; fi # Not Applicable
+        for db in $(find /etc/dconf/db -maxdepth 1 -type f); do
+          db_mtime=$(stat -c %Y "$db")
+          if [ -d "$db.d" ]; then
+            keyfile_mtime=$(stat -c %Y "$db".d/* 2>/dev/null | sort -n | tail -1)
+            if [ -n "$db_mtime" ] && [ -n "$keyfile_mtime" ] && [ "$db_mtime" -lt "$keyfile_mtime" ]; then
+              exit 1
+            fi
+          fi
+        done
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify dconf database is more recent than keyfiles"
+    remediation:
+      commands:
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Update the dconf databases"
+    rollback:
+      commands:
+        - "# No direct rollback for dconf update; it syncs state with files."
+      description: "No rollback needed"

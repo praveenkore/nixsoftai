@@ -3,8 +3,14 @@ id: "V-230268"
 title: "The operating system must configure kernel parameters to prevent IP spoofing."
 severity: high
 original_severity: "CAT II"
+# Universal check - sysctl parameters are consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Reverse path filtering prevents IP spoofing attacks by verifying that source addresses are reachable via the interface they arrived on."
 check:
   type: sysctl

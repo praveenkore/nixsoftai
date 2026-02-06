@@ -1,0 +1,49 @@
+benchmark: STIG
+id: "V-269174"
+title: "AlmaLinux OS 9 library directories must have mode 755 or less permissive."
+stig_id: "ALMA-09-010800"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001499
+srg: SRG-OS-000259-GPOS-00100
+
+rationale: |
+  Library directories should not be writable by group or others to prevent tampering.
+  Mode 755 (rwxr-xr-x) allows access but prevents modification.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "-L", "/lib", "/lib64", "/usr/lib", "/usr/lib64", "-perm", "/022", "-type", "d", "-exec", "ls", "-ld", "{}", ";"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify library directories are not group/world writable"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find command to identify and chmod non-compliant directories'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for library directory permissions"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["find", "-L", "/lib", "/lib64", "/usr/lib", "/usr/lib64", "-perm", "/022", "-type", "d", "-exec", "ls", "-ld", "{}", ";"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify library directories are not group/world writable"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find command to identify and chmod non-compliant directories'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for library directory permissions"
+    rollback:
+      commands: []
+      description: "Manual rollback"

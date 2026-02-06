@@ -1,0 +1,52 @@
+benchmark: STIG
+id: "V-269124"
+title: "AlmaLinux OS 9 must implement DOD-approved TLS encryption in the OpenSSL package."
+stig_id: "ALMA-09-004090"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  OpenSSL must be configured to use TLS 1.2 or stronger.
+  Weak protocols like TLS 1.0 or 1.1 must be disabled to prevent downgrade attacks.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "MinProtocol", "/etc/crypto-policies/back-ends/opensslcnf.config"]
+      expected_state: "contains"
+      expected_value: "TLS.MinProtocol = TLSv1.2"
+      description: "Verify MinProtocol is set to TLSv1.2 in crypto-policies"
+    remediation:
+      commands:
+        - "sed -i 's/TLS.MinProtocol = .*/TLS.MinProtocol = TLSv1.2/' /etc/crypto-policies/back-ends/opensslcnf.config"
+        - "sed -i 's/DTLS.MinProtocol = .*/DTLS.MinProtocol = DTLSv1.2/' /etc/crypto-policies/back-ends/opensslcnf.config"
+      requires_restart: false
+      requires_reboot: true
+      description: "Update MinProtocol to TLSv1.2 in crypto-policies"
+    rollback:
+      commands:
+        - "update-crypto-policies --set DEFAULT"
+      description: "Reset crypto-policies to DEFAULT"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-i", "MinProtocol", "/etc/ssl/openssl.cnf"]
+      expected_state: "contains"
+      expected_value: "MinProtocol = TLSv1.2"
+      description: "Verify MinProtocol is set to TLSv1.2 in openssl.cnf"
+    remediation:
+      commands:
+        - "sed -i 's/MinProtocol = .*/MinProtocol = TLSv1.2/' /etc/ssl/openssl.cnf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Update MinProtocol to TLSv1.2 in openssl.cnf"
+    rollback:
+      commands:
+        - "sed -i 's/MinProtocol = TLSv1.2/MinProtocol = TLSv1.0/' /etc/ssl/openssl.cnf"
+      description: "Revert MinProtocol (Example fallback, manual review recommended)"

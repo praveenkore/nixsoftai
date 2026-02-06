@@ -1,0 +1,58 @@
+benchmark: STIG
+id: "V-269105"
+title: "AlmaLinux OS 9 must prevent a user from overriding the session idle-delay setting for the graphical user interface."
+stig_id: "ALMA-09-001340"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000060
+srg: SRG-OS-000031-GPOS-00012
+
+rationale: |
+  A session lock is a temporary action taken when a user stops work and moves away from the immediate
+  physical vicinity of the information system but does not log out. The session lock must be enforced
+  and users should not be allowed to change session settings to disable or delay it.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "/org/gnome/desktop/session/idle-delay", "/etc/dconf/db/local.d/locks/"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/desktop/session/idle-delay"
+      description: "Verify 'idle-delay' is locked in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/desktop/session/idle-delay' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock the 'idle-delay' setting in dconf"
+    rollback:
+      commands:
+        - "sed -i '|/org/gnome/desktop/session/idle-delay|d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Unlock the 'idle-delay' setting"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "/org/gnome/desktop/session/idle-delay", "/etc/dconf/db/local.d/locks/"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/desktop/session/idle-delay"
+      description: "Verify 'idle-delay' is locked in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/desktop/session/idle-delay' >> /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock the 'idle-delay' setting in dconf"
+    rollback:
+      commands:
+        - "sed -i '|/org/gnome/desktop/session/idle-delay|d' /etc/dconf/db/local.d/locks/00-security-settings-lock"
+        - "dconf update"
+      description: "Unlock the 'idle-delay' setting"

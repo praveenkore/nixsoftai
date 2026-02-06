@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269163"
+title: "AlmaLinux OS 9 must check the GPG signature of software packages originating from external software repositories before installation."
+stig_id: "ALMA-09-009590"
+original_severity: "CAT I"
+severity: high
+cci: CCI-003992
+srg: SRG-OS-000366-GPOS-00153
+
+rationale: |
+  Ensuring that all software packages are signed by a trusted key prevents the installation
+  of malicious or tampered software. 'gpgcheck=1' enforces this verification.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^gpgcheck=1", "/etc/dnf/dnf.conf"]
+      expected_state: "contains"
+      expected_value: "gpgcheck=1"
+      description: "Verify gpgcheck is enabled in dnf.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^gpgcheck.*/gpgcheck=1/' /etc/dnf/dnf.conf"
+        - "grep -q '^gpgcheck=1' /etc/dnf/dnf.conf || echo 'gpgcheck=1' >> /etc/dnf/dnf.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable gpgcheck in dnf.conf"
+    rollback:
+      commands:
+        - "sed -i '/^gpgcheck=1/d' /etc/dnf/dnf.conf"
+      description: "Remove gpgcheck configuration"

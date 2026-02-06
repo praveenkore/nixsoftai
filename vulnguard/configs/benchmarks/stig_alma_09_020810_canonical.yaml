@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269264"
+title: "AlmaLinux OS 9 must not allow a noncertificate trusted host SSH logon to the system."
+stig_id: "ALMA-09-020810"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269264"
+
+rationale: |
+  SSH trust relationships mean a compromise on one host can allow an attacker to move trivially to other hosts. Host-based authentication is not sufficient for preventing unauthorized access.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sshd", "-T"]
+      script: |
+        sshd -T | grep -i "^hostbasedauthentication" | grep "^hostbasedauthentication no"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify HostbasedAuthentication is set to no"
+    remediation:
+      commands:
+        - "if [ -d /etc/ssh/sshd_config.d ]; then echo 'HostbasedAuthentication no' > /etc/ssh/sshd_config.d/40-hostbasedauthentication.conf; else sed -i '/^#*HostbasedAuthentication/c\HostbasedAuthentication no' /etc/ssh/sshd_config; fi"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable HostbasedAuthentication"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-hostbasedauthentication.conf"
+        - "systemctl restart sshd.service"
+      description: "Remove HostbasedAuthentication restriction"

@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269278"
+title: "The kdump service on AlmaLinux OS 9 must be disabled."
+stig_id: "ALMA-09-022350"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269278"
+
+rationale: |
+  Kernel core dumps may contain the full contents of system memory at the time of the crash. Kernel core dumps consume a considerable amount of disk space and may result in denial of service by exhausting the available space on the target file system partition.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        # Check enabled, active, and masked status
+        if systemctl is-enabled kdump 2>/dev/null | grep -qv "masked"; then exit 1; fi
+        if systemctl is-active kdump 2>/dev/null | grep -qv "inactive"; then exit 1; fi
+        systemctl show kdump | grep "LoadState=masked" && systemctl show kdump | grep "UnitFileState=masked"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify kdump is inactive and masked"
+    remediation:
+      commands:
+        - "systemctl mask --now kdump"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask and stop kdump service"
+    rollback:
+      commands:
+        - "systemctl unmask kdump"
+        - "systemctl enable kdump"
+      description: "Unmask and enable kdump service"

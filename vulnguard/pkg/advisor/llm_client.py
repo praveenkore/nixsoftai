@@ -33,8 +33,7 @@ import time
 import threading
 from abc import ABC, abstractmethod
 from functools import wraps
-from typing import Any, Dict, List, Optional, Tuple, Type
-from typing import TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING
 from vulnguard.pkg.logging.logger import AuditLogger
 
 import httpx
@@ -44,11 +43,23 @@ if TYPE_CHECKING:
     import torch  # type: ignore[import-untyped]
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-untyped]
 
+# Import OpenAI SDK for OpenRouter compatibility
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+
 # Global HTTP client pool for connection pooling
 _http_client_pool: Dict[str, Any] = {}
 _http_client_last_access: Dict[str, float] = {}
+_http_client_creation_time: Dict[str, float] = {}
 _http_client_lock = threading.Lock()
+_http_cleanup_thread: Optional[threading.Thread] = None
+_http_cleanup_stop_event = threading.Event()
 MAX_POOL_SIZE = 10
+MAX_CLIENT_IDLE_TIME = 300  # Close clients idle for 5 minutes
+MAX_CLIENT_LIFETIME = 3600  # Recycle clients after 1 hour
 
 
 class RateLimiter:
@@ -182,6 +193,54 @@ def retry_with_exponential_backoff(
     return decorator
 
 
+def _start_cleanup_thread() -> None:
+    """Start the background cleanup thread if not already running."""
+    global _http_cleanup_thread
+    with _http_client_lock:
+        if _http_cleanup_thread is None or not _http_cleanup_thread.is_alive():
+            _http_cleanup_stop_event.clear()
+            _http_cleanup_thread = threading.Thread(
+                target=_cleanup_idle_clients,
+                daemon=True,
+                name="http_client_cleanup"
+            )
+            _http_cleanup_thread.start()
+
+
+def _cleanup_idle_clients() -> None:
+    """Background thread that periodically closes idle HTTP clients."""
+    while not _http_cleanup_stop_event.wait(60):  # Check every 60 seconds
+        try:
+            current_time = time.time()
+            clients_to_close = []
+            
+            with _http_client_lock:
+                # Find idle or expired clients
+                for endpoint_key in list(_http_client_pool.keys()):
+                    last_access = _http_client_last_access.get(endpoint_key, 0)
+                    creation_time = _http_client_creation_time.get(endpoint_key, 0)
+                    idle_time = current_time - last_access
+                    lifetime = current_time - creation_time
+                    
+                    # Close if idle too long or exceeded max lifetime
+                    if idle_time > MAX_CLIENT_IDLE_TIME or lifetime > MAX_CLIENT_LIFETIME:
+                        clients_to_close.append((endpoint_key, _http_client_pool[endpoint_key]))
+                        del _http_client_pool[endpoint_key]
+                        del _http_client_last_access[endpoint_key]
+                        if endpoint_key in _http_client_creation_time:
+                            del _http_client_creation_time[endpoint_key]
+            
+            # Close clients outside the lock to avoid blocking
+            for endpoint_key, client in clients_to_close:
+                try:
+                    client.close()
+                except Exception:
+                    pass  # Ignore close errors
+                    
+        except Exception:
+            pass  # Ignore errors in cleanup thread
+
+
 def get_shared_http_client(
     endpoint: str,
     timeout: int = 30,
@@ -203,13 +262,28 @@ def get_shared_http_client(
     # Normalize endpoint for use as key
     endpoint_key = endpoint.rstrip('/')
     
+    # Ensure cleanup thread is running
+    _start_cleanup_thread()
+    
     with _http_client_lock:
         current_time = time.time()
+        
+        # Check if existing client needs recycling (exceeded max lifetime)
+        if endpoint_key in _http_client_pool:
+            creation_time = _http_client_creation_time.get(endpoint_key, 0)
+            if current_time - creation_time > MAX_CLIENT_LIFETIME:
+                # Recycle the client
+                try:
+                    _http_client_pool[endpoint_key].close()
+                except Exception:
+                    pass
+                del _http_client_pool[endpoint_key]
+                del _http_client_last_access[endpoint_key]
+                del _http_client_creation_time[endpoint_key]
         
         # Cleanup mechanism: Evict LRU if pool is full and we need to add a new one
         if endpoint_key not in _http_client_pool and len(_http_client_pool) >= MAX_POOL_SIZE:
             # Find least recently used key
-            # Sort keys by access time
             sorted_keys = sorted(_http_client_last_access.keys(), key=lambda k: _http_client_last_access[k])
             
             # Remove oldest (first in sorted list)
@@ -217,9 +291,11 @@ def get_shared_http_client(
             try:
                 _http_client_pool[lru_key].close()
             except Exception:
-                pass # Ignore close errors
+                pass  # Ignore close errors
             del _http_client_pool[lru_key]
             del _http_client_last_access[lru_key]
+            if lru_key in _http_client_creation_time:
+                del _http_client_creation_time[lru_key]
 
         if endpoint_key not in _http_client_pool:
             # Configure connection limits
@@ -233,6 +309,7 @@ def get_shared_http_client(
                 timeout=timeout,
                 limits=httpx.Limits(**limits)
             )
+            _http_client_creation_time[endpoint_key] = current_time
         
         # Update last access time
         _http_client_last_access[endpoint_key] = current_time
@@ -246,6 +323,13 @@ def close_http_clients():
     
     Should be called when shutting down the application.
     """
+    global _http_cleanup_thread
+    
+    # Stop the cleanup thread
+    _http_cleanup_stop_event.set()
+    if _http_cleanup_thread and _http_cleanup_thread.is_alive():
+        _http_cleanup_thread.join(timeout=5)
+    
     with _http_client_lock:
         for client in _http_client_pool.values():
             try:
@@ -253,6 +337,8 @@ def close_http_clients():
             except Exception:
                 pass
         _http_client_pool.clear()
+        _http_client_last_access.clear()
+        _http_client_creation_time.clear()
 
 
 class BaseLLMClient(ABC):
@@ -333,7 +419,7 @@ class BaseLLMClient(ABC):
 
 class OpenRouterClient(BaseLLMClient):
     """
-    OpenRouter API client for accessing multiple LLM providers.
+    OpenRouter API client for accessing multiple LLM providers using OpenAI SDK.
     
     OpenRouter provides unified access to multiple LLM providers including:
     - OpenAI (GPT models)
@@ -343,59 +429,75 @@ class OpenRouterClient(BaseLLMClient):
     - And many more
     
     Features:
+    - Uses OpenAI SDK for standard API pattern
     - Retry logic with exponential backoff
-    - Connection pooling for efficiency
     - Rate limiting to prevent quota exhaustion
+    - Support for custom headers (HTTP-Referer, X-Title)
     """
     
     def __init__(
         self,
         api_key: str,
         model: str = "openai/gpt-4-turbo",
-        api_endpoint: str = "https://openrouter.ai/api/v1/chat/completions",
+        base_url: str = "https://openrouter.ai/api/v1",
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
         timeout: int = 30,
         site_url: str = "https://openrouter.ai",
+        site_name: str = "VulnGuard Security Compliance Agent",
         max_retries: int = 3,
         rate_limit: Optional[int] = None
     ):
         """
-        Initialize the OpenRouter client.
+        Initialize the OpenRouter client using OpenAI SDK.
         
         Args:
             api_key: OpenRouter API key
-            model: Model identifier (e.g., "openai/gpt-4-turbo", "anthropic/claude-3-opus")
-            api_endpoint: API endpoint URL
+            model: Model identifier (e.g., "openai/gpt-4-turbo", "z-ai/glm-4.5-air:free")
+            base_url: Base URL for OpenRouter API (default: https://openrouter.ai/api/v1)
             logger: Optional audit logger instance
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
             timeout: Request timeout in seconds
-            site_url: OpenRouter site URL for headers
+            site_url: Site URL for OpenRouter rankings (HTTP-Referer header)
+            site_name: Site name for OpenRouter rankings (X-Title header)
             max_retries: Maximum number of retry attempts
             rate_limit: Optional rate limit (requests per minute)
         """
         super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.api_key = api_key
         self.model = model
-        self.api_endpoint = api_endpoint
+        self.base_url = base_url
         self.site_url = site_url
+        self.site_name = site_name
         
-        # Use shared HTTP client for connection pooling
-        self.http_client = get_shared_http_client(api_endpoint, timeout)
+        # Check if OpenAI SDK is available
+        if not OPENAI_AVAILABLE:
+            raise ImportError(
+                "OpenAI SDK is required for OpenRouter client. "
+                "Install it with: pip install openai>=1.0.0"
+            )
+        
+        # Initialize OpenAI client with custom base_url
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries
+        )
     
     def _make_request(
         self,
-        headers: Dict[str, str],
-        payload: Dict[str, Any]
+        extra_headers: Dict[str, str],
+        messages: List[Dict[str, str]]
     ) -> str:
         """
-        Make HTTP request with retry logic.
+        Make API request with retry logic using OpenAI SDK.
         
         Args:
-            headers: HTTP headers
-            payload: Request payload
+            extra_headers: Extra headers (HTTP-Referer, X-Title)
+            messages: List of message dictionaries
             
         Returns:
             Response content as string
@@ -412,14 +514,14 @@ class OpenRouterClient(BaseLLMClient):
             retry_on=(Exception,)
         )
         def _request():
-            response = self.http_client.post(
-                self.api_endpoint,
-                headers=headers,
-                json=payload
+            completion = self.client.chat.completions.create(
+                extra_headers=extra_headers,
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
             )
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
+            return completion.choices[0].message.content
         
         return _request()
     
@@ -429,7 +531,7 @@ class OpenRouterClient(BaseLLMClient):
         system_prompt: Optional[str] = None
     ) -> str:
         """
-        Generate a response from OpenRouter.
+        Generate a response from OpenRouter using OpenAI SDK.
         
         Args:
             prompt: User prompt
@@ -438,6 +540,7 @@ class OpenRouterClient(BaseLLMClient):
         Returns:
             LLM response as string
         """
+        # Build messages list
         messages = []
         
         if system_prompt:
@@ -445,22 +548,14 @@ class OpenRouterClient(BaseLLMClient):
         
         messages.append({"role": "user", "content": prompt})
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
+        # Build extra headers for OpenRouter
+        extra_headers = {
             "HTTP-Referer": self.site_url,
-            "X-Title": "VulnGuard Security Compliance Agent"
-        }
-        
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature
+            "X-Title": self.site_name
         }
         
         try:
-            return self._make_request(headers, payload)
+            return self._make_request(extra_headers, messages)
         except Exception as e:
             self.logger.log_error(
                 "llm_client",
@@ -472,15 +567,23 @@ class OpenRouterClient(BaseLLMClient):
     def get_model_name(self) -> str:
         """Get the name of the model being used."""
         return f"OpenRouter:{self.model}"
+    
+    def __del__(self):
+        """Cleanup OpenAI client on deletion."""
+        if hasattr(self, 'client') and self.client is not None:
+            try:
+                self.client.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
 
 
 class OpenAIClient(BaseLLMClient):
     """
-    OpenAI API client for GPT models.
+    OpenAI API client for GPT models using OpenAI SDK.
     
     Features:
+    - Uses OpenAI SDK for standard API pattern
     - Retry logic with exponential backoff
-    - Connection pooling for efficiency
     - Rate limiting to prevent quota exhaustion
     """
     
@@ -488,7 +591,7 @@ class OpenAIClient(BaseLLMClient):
         self,
         api_key: str,
         model: str = "gpt-4-turbo-preview",
-        api_endpoint: str = "https://api.openai.com/v1/chat/completions",
+        base_url: str = "https://api.openai.com/v1",
         logger: Optional[AuditLogger] = None,
         max_tokens: int = 2000,
         temperature: float = 0.3,
@@ -497,12 +600,12 @@ class OpenAIClient(BaseLLMClient):
         rate_limit: Optional[int] = None
     ):
         """
-        Initialize the OpenAI client.
+        Initialize the OpenAI client using OpenAI SDK.
         
         Args:
             api_key: OpenAI API key
             model: Model name
-            api_endpoint: API endpoint URL
+            base_url: Base URL for OpenAI API (default: https://api.openai.com/v1)
             logger: Optional audit logger instance
             max_tokens: Maximum tokens in response
             temperature: Sampling temperature
@@ -513,22 +616,32 @@ class OpenAIClient(BaseLLMClient):
         super().__init__(logger, max_tokens, temperature, timeout, max_retries, rate_limit)
         self.api_key = api_key
         self.model = model
-        self.api_endpoint = api_endpoint
+        self.base_url = base_url
         
-        # Use shared HTTP client for connection pooling
-        self.http_client = get_shared_http_client(api_endpoint, timeout)
+        # Check if OpenAI SDK is available
+        if not OPENAI_AVAILABLE:
+            raise ImportError(
+                "OpenAI SDK is required. "
+                "Install it with: pip install openai>=1.0.0"
+            )
+        
+        # Initialize OpenAI client
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries
+        )
     
     def _make_request(
         self,
-        headers: Dict[str, str],
-        payload: Dict[str, Any]
+        messages: List[Dict[str, str]]
     ) -> str:
         """
-        Make HTTP request with retry logic.
+        Make API request with retry logic using OpenAI SDK.
         
         Args:
-            headers: HTTP headers
-            payload: Request payload
+            messages: List of message dictionaries
             
         Returns:
             Response content as string
@@ -545,14 +658,13 @@ class OpenAIClient(BaseLLMClient):
             retry_on=(Exception,)
         )
         def _request():
-            response = self.http_client.post(
-                self.api_endpoint,
-                headers=headers,
-                json=payload
+            completion = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
             )
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"]
+            return completion.choices[0].message.content
         
         return _request()
     
@@ -562,7 +674,7 @@ class OpenAIClient(BaseLLMClient):
         system_prompt: Optional[str] = None
     ) -> str:
         """
-        Generate a response from OpenAI GPT.
+        Generate a response from OpenAI GPT using OpenAI SDK.
         
         Args:
             prompt: User prompt
@@ -571,6 +683,7 @@ class OpenAIClient(BaseLLMClient):
         Returns:
             LLM response as string
         """
+        # Build messages list
         messages = []
         
         if system_prompt:
@@ -578,20 +691,8 @@ class OpenAIClient(BaseLLMClient):
         
         messages.append({"role": "user", "content": prompt})
         
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature
-        }
-        
         try:
-            return self._make_request(headers, payload)
+            return self._make_request(messages)
         except Exception as e:
             self.logger.log_error(
                 "llm_client",
@@ -603,6 +704,14 @@ class OpenAIClient(BaseLLMClient):
     def get_model_name(self) -> str:
         """Get the name of the model being used."""
         return f"OpenAI:{self.model}"
+    
+    def __del__(self):
+        """Cleanup OpenAI client on deletion."""
+        if hasattr(self, 'client') and self.client is not None:
+            try:
+                self.client.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
 
 
 class AnthropicClient(BaseLLMClient):
@@ -1115,22 +1224,32 @@ def create_llm_client(
             # Try to get from environment variable
             env_var = config.get("api_key", "").strip("${}")
             api_key = os.getenv(env_var, "")
-        
+
         if not api_key:
             raise ValueError(
                 "OpenRouter API key not found. Set OPENROUTER_API_KEY environment variable "
                 "or provide api_key in config."
             )
-        
+
+        # Support both base_url and legacy api_endpoint parameter
+        base_url = config.get("base_url") or config.get(
+            "api_endpoint",
+            "https://openrouter.ai/api/v1/chat/completions"
+        )
+        # Strip /chat/completions suffix if present for OpenAI SDK base_url
+        if base_url.endswith("/chat/completions"):
+            base_url = base_url[:-17]
+
         return OpenRouterClient(
             api_key=api_key,
             model=config.get("model", "openai/gpt-4-turbo"),
-            api_endpoint=config.get("api_endpoint", "https://openrouter.ai/api/v1/chat/completions"),
+            base_url=base_url,
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),
             timeout=config.get("timeout", 30),
             site_url=config.get("site_url", "https://openrouter.ai"),
+            site_name=config.get("site_name", "VulnGuard Security Compliance Agent"),
             max_retries=max_retries,
             rate_limit=rate_limit
         )
@@ -1141,17 +1260,26 @@ def create_llm_client(
             # Try to get from environment variable
             env_var = config.get("api_key", "").strip("${}")
             api_key = os.getenv(env_var, "")
-        
+
         if not api_key:
             raise ValueError(
                 "OpenAI API key not found. Set OPENAI_API_KEY environment variable "
                 "or provide api_key in config."
             )
-        
+
+        # Support both base_url and legacy api_endpoint parameter
+        base_url = config.get("base_url") or config.get(
+            "api_endpoint",
+            "https://api.openai.com/v1/chat/completions"
+        )
+        # Strip /chat/completions suffix if present for OpenAI SDK base_url
+        if base_url.endswith("/chat/completions"):
+            base_url = base_url[:-17]
+
         return OpenAIClient(
             api_key=api_key,
             model=config.get("model", "gpt-4-turbo-preview"),
-            api_endpoint=config.get("api_endpoint", "https://api.openai.com/v1/chat/completions"),
+            base_url=base_url,
             logger=logger,
             max_tokens=config.get("max_tokens", 2000),
             temperature=config.get("temperature", 0.3),

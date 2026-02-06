@@ -1,0 +1,42 @@
+benchmark: STIG
+id: "V-269207"
+title: "AlmaLinux OS 9 must disable the user list at logon for graphical user interfaces."
+stig_id: "ALMA-09-014430"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269207"
+
+rationale: |
+  Leaving the user list enabled is a security risk since it allows anyone with physical access to the system to enumerate known user accounts without authenticated access to the system.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        if ! command -v gsettings &> /dev/null; then
+          echo "true" # compliant if no GUI/gsettings
+          exit 0
+        fi
+        gsettings get org.gnome.login-screen disable-user-list
+      expected_state: "contains"
+      expected_value: "true"
+      description: "Verify that user list is disabled in GNOME login screen"
+    remediation:
+      commands:
+        - "touch /etc/dconf/db/local.d/02-login-screen"
+        - "echo '[org/gnome/login-screen]' > /etc/dconf/db/local.d/02-login-screen"
+        - "echo 'disable-user-list=true' >> /etc/dconf/db/local.d/02-login-screen"
+        - "dconf update"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure dconf to disable user list"
+    rollback:
+      commands:
+        - "rm /etc/dconf/db/local.d/02-login-screen"
+        - "dconf update"
+      description: "Remove dconf configuration"

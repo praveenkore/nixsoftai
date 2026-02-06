@@ -3,8 +3,14 @@ id: "V-230271"
 title: "The file integrity tool must be configured to verify correct operation of security functions."
 severity: high
 original_severity: "CAT II"
+# Universal - AIDE configuration is similar across distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "AIDE must be configured with a database and scheduled checks to detect unauthorized changes to system files and directories."
 check:
   type: file

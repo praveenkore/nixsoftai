@@ -35,12 +35,14 @@ class EvaluationResult:
         self,
         rule_id: str,
         benchmark: str,
-        compliant: bool,
+        compliant: Optional[bool],
         severity: str,
         risk_level: str,
         ai_assist_required: bool,
         approval_required: bool,
-        exception_allowed: bool
+        exception_allowed: bool,
+        status: str = "evaluated",
+        applicability: str = "applicable"
     ):
         """
         Initialize an evaluation result.
@@ -48,12 +50,20 @@ class EvaluationResult:
         Args:
             rule_id: Rule identifier
             benchmark: Benchmark type (CIS or STIG)
-            compliant: Whether the system is compliant
+            compliant: Whether the system is compliant, or None if not applicable
             severity: Normalized severity level
-            risk_level: Risk level (low, medium, high, critical)
+            risk_level: Risk level (low, medium, high, critical) or N/A for not applicable rules
             ai_assist_required: Whether AI assistance is required
             approval_required: Whether approval is required
             exception_allowed: Whether exception is allowed
+            status: Evaluation status of the rule. Valid values:
+                - "evaluated": Rule was evaluated (risk level determined)
+                - "not_applicable": Rule not applicable (OS incompatible or other reason)
+                Default: "evaluated"
+            applicability: Applicability of the rule. Valid values:
+                - "applicable": Rule ran and was evaluated
+                - "not_applicable": Rule skipped due to OS incompatibility
+                Default: "applicable"
         """
         self.rule_id = rule_id
         self.benchmark = benchmark
@@ -63,6 +73,8 @@ class EvaluationResult:
         self.ai_assist_required = ai_assist_required
         self.approval_required = approval_required
         self.exception_allowed = exception_allowed
+        self.status = status
+        self.applicability = applicability
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert evaluation result to dictionary."""
@@ -74,7 +86,9 @@ class EvaluationResult:
             "risk_level": self.risk_level,
             "ai_assist_required": self.ai_assist_required,
             "approval_required": self.approval_required,
-            "exception_allowed": self.exception_allowed
+            "exception_allowed": self.exception_allowed,
+            "status": self.status,
+            "applicability": self.applicability
         }
 
 
@@ -156,21 +170,25 @@ class ComplianceEngine:
     def _determine_risk_level(
         self,
         normalized_severity: str,
-        compliant: bool
+        compliant: Optional[bool]
     ) -> str:
         """
         Determine risk level based on severity and compliance status.
-        
+
         Args:
             normalized_severity: Normalized severity level
-            compliant: Whether the system is compliant
-            
+            compliant: Whether the system is compliant, or None if not applicable, or None if not applicable
+
         Returns:
             Risk level (critical, high, medium, low)
         """
+        # If compliant is None (rule not applicable), return low risk
+        if compliant is None:
+            return 'low'
+
         if compliant:
             return 'low'
-        
+
         return self.RISK_LEVEL_MAPPING.get(normalized_severity, 'medium')
     
     def _determine_ai_assist_required(
@@ -273,18 +291,48 @@ class ComplianceEngine:
     ) -> EvaluationResult:
         """
         Evaluate a scan result and determine compliance status and risk level.
-        
+
         Args:
             scan_result: Scan result from the scanner
             rule_data: Optional rule configuration data
-            
+
         Returns:
             EvaluationResult object
         """
+        # Handle skipped rules (OS incompatible, manually disabled, or not applicable)
+        if scan_result.status in ("skipped_os", "skipped_manual", "not_applicable"):
+            # Load rule data if needed for severity information
+            if rule_data is None:
+                rule_data = self._load_rule_data(scan_result.rule_id, scan_result.benchmark)
+
+            if rule_data:
+                # Normalize severity for skipped rules
+                original_severity = rule_data.get('original_severity', 'medium')
+                normalized_severity = self._normalize_severity(
+                    scan_result.benchmark,
+                    original_severity
+                )
+            else:
+                normalized_severity = 'medium'
+
+            # Return evaluation result with not_applicable status
+            return EvaluationResult(
+                rule_id=scan_result.rule_id,
+                benchmark=scan_result.benchmark,
+                compliant=None,  # None for skipped rules
+                severity=normalized_severity,
+                risk_level='N/A',  # N/A for not applicable rules (no risk to assess)
+                ai_assist_required=False,  # No AI assist for skipped rules
+                approval_required=False,  # No approval needed for skipped rules
+                exception_allowed=False,
+                status='not_applicable',  # Indicate rule was not applicable
+                applicability='not_applicable'  # Propagate from ScanResult
+            )
+
         # Load rule data if not provided
         if rule_data is None:
             rule_data = self._load_rule_data(scan_result.rule_id, scan_result.benchmark)
-        
+
         if rule_data is None:
             # Default to basic evaluation if rule data not available
             normalized_severity = 'medium'
@@ -292,6 +340,7 @@ class ComplianceEngine:
             ai_assist_required = False
             approval_required = False
             exception_allowed = False
+            applicability = getattr(scan_result, 'applicability', 'applicable')
         else:
             # Normalize severity
             original_severity = rule_data.get('original_severity', 'medium')
@@ -299,29 +348,29 @@ class ComplianceEngine:
                 scan_result.benchmark,
                 original_severity
             )
-            
+
             # Determine risk level
             risk_level = self._determine_risk_level(
                 normalized_severity,
                 scan_result.compliant
             )
-            
+
             # Determine if AI assist is required
             ai_assist_required = self._determine_ai_assist_required(
                 rule_data,
                 scan_result
             )
-            
+
             # Determine if approval is required
             approval_required = self._determine_approval_required(
                 scan_result.benchmark,
                 normalized_severity,
                 rule_data
             )
-            
+
             # Check if exception is allowed
             exception_allowed = rule_data.get('exception_allowed', False)
-        
+
         # Create evaluation result
         result = EvaluationResult(
             rule_id=scan_result.rule_id,
@@ -331,9 +380,10 @@ class ComplianceEngine:
             risk_level=risk_level,
             ai_assist_required=ai_assist_required,
             approval_required=approval_required,
-            exception_allowed=exception_allowed
+            exception_allowed=exception_allowed,
+            applicability="applicable"  # Explicitly mark as applicable
         )
-        
+
         # Log evaluation
         self.logger.log_evaluation(
             scan_result.benchmark,
@@ -342,7 +392,7 @@ class ComplianceEngine:
             risk_level,
             ai_assist_required
         )
-        
+
         return result
     
     def evaluate_batch(
@@ -372,33 +422,39 @@ class ComplianceEngine:
     ) -> Dict[str, Any]:
         """
         Generate a summary of evaluation results.
-        
+
         Args:
             evaluation_results: List of evaluation results
-            
+
         Returns:
             Summary dictionary
         """
         total_rules = len(evaluation_results)
-        compliant_count = sum(1 for r in evaluation_results if r.compliant)
-        non_compliant_count = total_rules - compliant_count
-        
-        # Count by risk level
+
+        # Filter out not applicable rules for compliance calculations
+        evaluated_rules = [r for r in evaluation_results if r.applicability == 'applicable']
+        not_applicable_count = total_rules - len(evaluated_rules)
+
+        compliant_count = sum(1 for r in evaluated_rules if r.compliant)
+        non_compliant_count = len(evaluated_rules) - compliant_count
+
+        # Count by risk level (exclude N/A for not applicable rules)
         risk_counts = {
             'critical': 0,
             'high': 0,
             'medium': 0,
             'low': 0
         }
-        
+
         for result in evaluation_results:
-            risk_counts[result.risk_level] += 1
-        
+            if result.risk_level != 'N/A':  # Skip N/A risk levels from not applicable rules
+                risk_counts[result.risk_level] += 1
+
         # Count by benchmark
         benchmark_counts = {}
         for result in evaluation_results:
             benchmark_counts[result.benchmark] = benchmark_counts.get(result.benchmark, 0) + 1
-        
+
         # Count by severity
         severity_counts = {
             'critical': 0,
@@ -406,26 +462,45 @@ class ComplianceEngine:
             'medium': 0,
             'low': 0
         }
-        
+
         for result in evaluation_results:
             severity_counts[result.severity] += 1
-        
-        # Approval required count
-        approval_required_count = sum(1 for r in evaluation_results if r.approval_required)
-        
-        # AI assist required count
-        ai_assist_required_count = sum(1 for r in evaluation_results if r.ai_assist_required)
-        
+
+        # Approval required count (only for evaluated rules)
+        approval_required_count = sum(1 for r in evaluated_rules if r.approval_required)
+
+        # AI assist required count (only for evaluated rules)
+        ai_assist_required_count = sum(1 for r in evaluated_rules if r.ai_assist_required)
+
+        # Count by status
+        status_counts = {
+            'evaluated': 0,
+            'not_applicable': 0
+        }
+
+        for result in evaluation_results:
+            status_counts[result.status] = status_counts.get(result.status, 0) + 1
+
+        # Calculate compliance percentage based only on evaluated rules
+        evaluated_count = len(evaluated_rules)
+        compliance_percentage = round(
+            (compliant_count / evaluated_count * 100) if evaluated_count > 0 else 0,
+            2
+        )
+
         summary = {
             'total_rules': total_rules,
+            'evaluated_rules': evaluated_count,
+            'not_applicable_rules': not_applicable_count,
             'compliant_count': compliant_count,
             'non_compliant_count': non_compliant_count,
-            'compliance_percentage': round((compliant_count / total_rules * 100) if total_rules > 0 else 0, 2),
+            'compliance_percentage': compliance_percentage,
             'risk_distribution': risk_counts,
             'severity_distribution': severity_counts,
             'benchmark_distribution': benchmark_counts,
+            'status_distribution': status_counts,
             'approval_required_count': approval_required_count,
             'ai_assist_required_count': ai_assist_required_count
         }
-        
+
         return summary

@@ -3,8 +3,14 @@ id: "V-230266"
 title: "The operating system must configure kernel parameters to disable ICMP redirects."
 severity: medium
 original_severity: "CAT III"
+# Universal check - sysctl parameters are consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "ICMP redirects can be exploited for man-in-the-middle attacks and should be disabled."
 check:
   type: sysctl

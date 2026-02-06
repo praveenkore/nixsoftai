@@ -1,0 +1,57 @@
+benchmark: STIG
+id: "V-269161"
+title: "AlmaLinux OS 9 SSH daemon must not allow Generic Security Service Application Program Interface (GSSAPI) authentication."
+stig_id: "ALMA-09-009370"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001813
+srg: SRG-OS-000364-GPOS-00151
+
+rationale: |
+  Allowing GSSAPI authentication through SSH exposes the system's GSSAPI to remote hosts,
+  increasing the attack surface. It must be disabled to reduce this risk.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "^GSSAPIAuthentication no", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "GSSAPIAuthentication no"
+      description: "Verify GSSAPIAuthentication is set to no in sshd_config"
+    remediation:
+      commands:
+        - "sed -i '/^GSSAPIAuthentication/d' /etc/ssh/sshd_config"
+        - "echo 'GSSAPIAuthentication no' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable GSSAPIAuthentication in sshd_config"
+    rollback:
+      commands:
+        - "sed -i '/^GSSAPIAuthentication no/d' /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      description: "Revert GSSAPIAuthentication setting"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-i", "^GSSAPIAuthentication no", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "GSSAPIAuthentication no"
+      description: "Verify GSSAPIAuthentication is set to no in sshd_config"
+    remediation:
+      commands:
+        - "sed -i '/^GSSAPIAuthentication/d' /etc/ssh/sshd_config"
+        - "echo 'GSSAPIAuthentication no' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable GSSAPIAuthentication in sshd_config"
+    rollback:
+      commands:
+        - "sed -i '/^GSSAPIAuthentication no/d' /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      description: "Revert GSSAPIAuthentication setting"

@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269256"
+title: "AlmaLinux OS 9 must not send Internet Control Message Protocol (ICMP) redirects."
+stig_id: "ALMA-09-019930"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269256"
+
+rationale: |
+  The ability to send ICMP redirects is only appropriate for systems acting as routers.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "-a"]
+      script: |
+        sysctl -a | grep send_redirects | awk '{if ($3 != 0) exit 1}'
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify all send_redirects sysctl values are 0"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.conf.all.send_redirects = 0' > /etc/sysctl.d/99-stig-send-redirects.conf"
+        - "echo 'net.ipv4.conf.default.send_redirects = 0' >> /etc/sysctl.d/99-stig-send-redirects.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable sending ICMP redirects via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-send-redirects.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

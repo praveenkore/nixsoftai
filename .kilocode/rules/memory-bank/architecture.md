@@ -155,21 +155,50 @@ vulnguard/
 - [`Scanner`](../vulnguard/pkg/scanner/scanner.py:65) - Main scanner class
 - [`ScanResult`](../vulnguard/pkg/scanner/scanner.py:17) - Scan result data structure
 
+**Key Functions:**
+- [`_parse_os_release()`](../vulnguard/pkg/scanner/scanner.py:92) - Parse /etc/os-release for ID and ID_LIKE fields
+- [`_get_os_family()`](../vulnguard/pkg/scanner/scanner.py:143) - Map detected OS to OS family using OS_FAMILY_MAP
+- [`_is_os_compatible()`](../vulnguard/pkg/scanner/scanner.py:176) - Check OS compatibility with family-based matching
+
+**OS Family Map:**
+
+```python
+OS_FAMILY_MAP = {
+    "rhel": ["rhel", "red hat", "centos", "almalinux", "rocky"],
+    "debian": ["debian", "ubuntu"],
+}
+```
+
+**Supported Distributions:**
+- **RHEL Family**: RHEL, CentOS, AlmaLinux, Rocky Linux
+- **Debian Family**: Debian, Ubuntu
+
+**Status Field:**
+
+The `ScanResult` class includes a `status` field with the following values:
+
+| Status | Description |
+|--------|-------------|
+| `checked` | Rule was executed (compliant or not compliant) |
+| `skipped_os` | Rule skipped due to OS incompatibility |
+| `skipped_manual` | Rule manually disabled in configuration |
+| `not_applicable` | Rule not applicable for other reasons |
+
 **Responsibilities:**
 - Load and validate benchmark rule configurations
 - Execute defined check commands (command, file, service, sysctl)
 - Validate results against expected states
 - Determine compliance status
-- OS compatibility checking
+- OS compatibility checking with family-based support
 
 **Design Decisions:**
 - No AI integration in scanner - all checks are deterministic
 - Strict rule validation before execution
-- OS compatibility filtering
-
-- Timeout protection for all commands
+- OS compatibility filtering with family-based support
+- Timeout protection for all commands (configurable via `command_timeout`)
 - **Parallel Execution**: Uses `ThreadPoolExecutor` for concurrent rule scanning (IO-bound)
 - **Caching**: In-memory LRU caching of rule definitions to optimize repeated loads
+- Rules targeting "rhel" automatically apply to AlmaLinux, Rocky Linux, CentOS
 
 **Supported Check Types:**
 - **Command**: Execute shell commands and check exit codes
@@ -185,18 +214,57 @@ vulnguard/
 - [`ComplianceEngine`](../vulnguard/pkg/engine/engine.py:65) - Main evaluation engine
 - [`EvaluationResult`](../vulnguard/pkg/engine/engine.py:13) - Evaluation result data structure
 
+**Status Field:**
+
+The `EvaluationResult` class includes a `status` field with the following values:
+
+| Status | Description |
+|--------|-------------|
+| `evaluated` | Rule was evaluated (risk level determined) |
+| `not_applicable` | Rule not applicable (OS incompatible or other reason) |
+
 **Responsibilities:**
 - Normalize severities across benchmark standards
 - Determine risk levels based on severity and compliance
 - Decide if AI assistance is required
 - Determine approval requirements
-- Generate compliance summaries
+- Generate compliance summaries (excluding not_applicable rules)
 
 **Design Decisions:**
 - Centralized severity mapping for consistency
 - Risk level based on both severity and compliance status
 - AI assist only for ambiguous cases
 - Approval gating for high-risk rules
+- Not applicable rules are excluded from compliance calculations
+
+### OS Family Support (v1.1+)
+
+VulnGuard v1.1 introduced canonical rule format with OS family-based implementations:
+
+**OS Family Mapping:**
+- `rhel_family`: RHEL, CentOS, AlmaLinux, Rocky Linux
+- `debian_family`: Debian, Ubuntu
+
+**Canonical Rule Format:**
+```yaml
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check: {...}
+    remediation: {...}
+    rollback: {...}
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check: {...}
+    remediation: {...}
+    rollback: {...}
+```
+
+**Benefits:**
+- Single rule file supports multiple distributions
+- OS-specific command/package differences handled in implementation
+- Easier maintenance and extensibility
+- Graceful degradation: rules without matching OS implementation marked as `not_applicable`
 
 **Severity Normalization:**
 
@@ -214,7 +282,7 @@ vulnguard/
 **Purpose:** AI gateway and safety validator
 
 **Key Classes:**
-- [`AIAdvisor`](../vulnguard/pkg/advisor/advisor.py:76) - AI advisor with safety validation
+- [`AIAdvisor`](../vulnguard/pkg/advisor/advisor.py:76) - AI advisor with safety validation and batch processing
 - [`AIAdvisory`](../vulnguard/pkg/advisor/advisor.py:16) - AI advisory data structure
 - [`BaseLLMClient`](../vulnguard/pkg/advisor/llm_client.py:220) - Abstract base for LLM clients
 - [`OpenRouterClient`](../vulnguard/pkg/advisor/llm_client.py:296) - OpenRouter API client
@@ -244,9 +312,11 @@ vulnguard/
 - All output must pass strict validation
 - Confidence threshold prevents low-quality recommendations
 - Command allow-list/block-list prevents dangerous operations
+- Batch processing improves performance for multiple rules
 
 - Manual review required for low-confidence advisories
 - **Resource Management**: HTTP client pool eviction to prevent memory leaks
+- **Batch Processing**: `get_advisories_batch()` for concurrent AI advisory generation
 
 ### 4. Remediation Module
 
@@ -326,16 +396,19 @@ vulnguard/
 **Key Classes:**
 - [`GatewayClient`](../vulnguard/pkg/gateway/client.py) - HTTPS client for reporting
 - [`GatewayError`](../vulnguard/pkg/gateway/exceptions.py) - Gateway-specific exceptions
+- [`GatewaySecurityError`](../vulnguard/pkg/gateway/exceptions.py) - Security-specific exceptions
 
 **Responsibilities:**
 - Push compliance reports in JSON format to C2 server
 - Handle secure authentication (mTLS/API Key)
 - Provide retry and error handling for unreliable connections
+- Support TLS certificate pinning for enhanced security
 
 **Security Controls:**
 - **Encryption**: TLS 1.3 for all data in transit.
 - **Verification**: Mandatory SSL certificate validation.
 - **Authentication**: Pre-shared API keys or certificate-based auth.
+- **Certificate Pinning**: Optional SHA-256 fingerprint verification for server certificates.
 
 - `approval_request`: Approval requirement
 - `error`: Error events
@@ -488,6 +561,7 @@ TEMP_DIR_PERMISSIONS = 0o700
 - Defensive programming with comprehensive error handling
 - Follows enterprise security standards
 - Designed to pass security audits and penetration testing
+- Path traversal protection with `os.path.commonpath` validation
 
 ### 7. Main Orchestrator
 

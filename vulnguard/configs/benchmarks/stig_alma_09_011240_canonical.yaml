@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269178"
+title: "AlmaLinux OS 9 must disable core dumps for all users."
+stig_id: "ALMA-09-011240"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Core dumps may contain sensitive data (passwords, encryption keys).
+  Disabling them globally via limits.conf prevents this information leakage.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "hard core 0", "/etc/security/limits.conf", "/etc/security/limits.d/"]
+      expected_state: "contains"
+      expected_value: "* hard core 0"
+      description: "Verify hard core limit is 0"
+    remediation:
+      commands:
+        - "echo '* hard core 0' > /etc/security/limits.d/99-disable-core.conf"
+      requires_restart: false
+      requires_reboot: true
+      description: "Disable core dumps in limits.d"
+    rollback:
+      commands:
+        - "rm -f /etc/security/limits.d/99-disable-core.conf"
+      description: "Remove core dump limit config"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "hard core 0", "/etc/security/limits.conf", "/etc/security/limits.d/"]
+      expected_state: "contains"
+      expected_value: "* hard core 0"
+      description: "Verify hard core limit is 0"
+    remediation:
+      commands:
+        - "echo '* hard core 0' > /etc/security/limits.d/99-disable-core.conf"
+      requires_restart: false
+      requires_reboot: true
+      description: "Disable core dumps in limits.d"
+    rollback:
+      commands:
+        - "rm -f /etc/security/limits.d/99-disable-core.conf"
+      description: "Remove core dump limit config"

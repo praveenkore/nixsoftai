@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269245"
+title: "The firewalld service on AlmaLinux OS 9 must be active."
+stig_id: "ALMA-09-018720"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366, CCI-000382, CCI-002314
+srg: SRG-OS-000480-GPOS-00232
+vulnerability_id: "V-269245"
+
+rationale: |
+  "Firewalld" provides an easy and effective way to block/limit remote access to the system via ports, services, and protocols.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["systemctl", "is-active", "firewalld"]
+      expected_state: "exact"
+      expected_value: "active"
+      description: "Verify firewalld service is active"
+    remediation:
+      commands:
+        - "systemctl enable --now firewalld"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable and start firewalld service"
+    rollback:
+      commands:
+        - "systemctl disable --now firewalld"
+      description: "Disable firewalld service"

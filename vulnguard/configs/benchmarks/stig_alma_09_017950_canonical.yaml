@@ -1,0 +1,37 @@
+benchmark: STIG
+id: "V-269238"
+title: "AlmaLinux OS 9 must not have unauthorized accounts."
+stig_id: "ALMA-09-017950"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269238"
+
+rationale: |
+  Accounts that are not used by an active user or cannot be associated with a valid business process must be removed to minimize the attack surface.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        # This is a manual check in STIG, but we can list non-standard accounts
+        # List users with UID >= 1000
+        awk -F: '($3>=1000)&&($7 !~ /nologin/){print $1}' /etc/passwd
+        exit 0
+      expected_state: "manual"
+      expected_value: "manual"
+      description: "List all interactive users. Review list for unauthorized accounts."
+    remediation:
+      commands:
+        - "# Manual remediation required: Delete unauthorized accounts using 'userdel -r <username>'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation required"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

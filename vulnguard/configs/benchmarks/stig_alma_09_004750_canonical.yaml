@@ -1,0 +1,47 @@
+benchmark: STIG
+id: "V-269128"
+title: "AlmaLinux OS 9 must automatically expire temporary accounts within 72 hours."
+stig_id: "ALMA-09-004750"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000016
+srg: SRG-OS-000002-GPOS-00002
+
+rationale: |
+  Temporary accounts must be set to expire to prevent indefinite access.
+  This rule requires identifying temporary accounts which is a manual process.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: manual
+      command: []
+      expected_state: "manual"
+      expected_value: "Review temporary accounts with 'chage -l' and ensure 72h expiration"
+      description: "Manual review of temporary account expiration"
+    remediation:
+      commands: []
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation: use 'chage -E' for identified accounts"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: manual
+      command: []
+      expected_state: "manual"
+      expected_value: "Review temporary accounts with 'chage -l' and ensure 72h expiration"
+      description: "Manual review of temporary account expiration"
+    remediation:
+      commands: []
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation: use 'chage -E' for identified accounts"
+    rollback:
+      commands: []
+      description: "Manual rollback"

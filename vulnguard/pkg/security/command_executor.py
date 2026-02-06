@@ -66,8 +66,25 @@ class SecureCommandExecutor:
     # Default command allow-list (regex patterns)
     # These patterns define which commands are allowed to execute
     DEFAULT_COMMAND_ALLOWLIST = [
+        # System management commands
         r'^systemctl$',
         r'^sysctl$',
+        r'^modprobe$',
+        r'^lsmod$',
+        r'^insmod$',
+        r'^rmmod$',
+        r'^depmod$',
+        # Package management commands (RHEL-based)
+        r'^rpm$',
+        r'^yum$',
+        r'^dnf$',
+        r'^rpmkeys$',
+        # Package management commands (Debian-based)
+        r'^dpkg$',
+        r'^apt-get$',
+        r'^apt$',
+        r'^apt-cache$',
+        # File operations
         r'^chmod$',
         r'^chown$',
         r'^sed$',
@@ -79,7 +96,7 @@ class SecureCommandExecutor:
         r'^ls$',
         r'^find$',
         r'^test$',
-        r'\[',
+        r'\ [$',
         r'^which$',
         r'^id$',
         r'^whoami$',
@@ -94,7 +111,40 @@ class SecureCommandExecutor:
         r'^ss$',
         r'^ip$',
         r'^getent$',
-        r'^pwd$'
+        r'^pwd$',
+        # Security commands
+        r'^getenforce$',
+        r'^setenforce$',
+        r'^sestatus$',
+        r'^semodule$',
+        r'^ausearch$',
+        r'^aureport$',
+        r'^firewall-cmd$',
+        r'^firewall-offline-cmd$',
+        r'^aideinit$',
+        r'^aide$',
+        # Service management
+        r'^service$',
+        r'^chkconfig$',
+        r'^update-rc.d$',
+        # Other utilities
+        r'^date$',
+        r'^tail$',
+        r'^head$',
+        r'^sort$',
+        r'^uniq$',
+        r'^wc$',
+        r'^cut$',
+        r'^tr$',
+        r'^xargs$',
+        r'^dirname$',
+        r'^basename$',
+        r'^mktemp$',
+        r'^touch$',
+        r'^mkdir$',
+        r'^rm$',
+        r'^cp$',
+        r'^mv$'
     ]
     
     # Command block-list (regex patterns)
@@ -524,28 +574,3 @@ class SecureCommandExecutor:
                 {"shell_command": shell_command}
             )
             return -1, "", str(e)
-
-
-# Convenience function for backward compatibility
-def execute_command_safely(
-    command: str,
-    timeout: int = 30,
-    logger: Optional["AuditLogger"] = None
-) -> Tuple[int, str, str]:
-    """
-    Convenience function to execute a command safely.
-    
-    This function provides a drop-in replacement for existing code that
-    uses subprocess.run with shell=True. It parses the command and
-    executes it securely.
-    
-    Args:
-        command: Command string to execute
-        timeout: Timeout in seconds
-        logger: Optional audit logger
-        
-    Returns:
-        Tuple of (exit_code, stdout, stderr)
-    """
-    executor = SecureCommandExecutor(logger=logger, timeout=timeout)
-    return executor.execute_shell_command_safely(command, timeout=timeout)

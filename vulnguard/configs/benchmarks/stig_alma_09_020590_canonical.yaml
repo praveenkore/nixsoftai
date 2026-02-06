@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269262"
+title: "The AlmaLinux OS 9 SSH server configuration file must be owned by root."
+stig_id: "ALMA-09-020590"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269262"
+
+rationale: |
+  Service configuration files enable or disable features of their respective services, which if configured incorrectly, can lead to insecure and vulnerable configurations. Therefore, service configuration files must be owned by the correct owner to prevent unauthorized changes.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "/etc/ssh/sshd_config", "/etc/ssh/sshd_config.d", "-exec", "stat", "-c", "%U", "{}", "+"]
+      script: |
+        find /etc/ssh/sshd_config /etc/ssh/sshd_config.d -exec stat -c "%U" {} + | grep -v "^root$"
+        if [ $? -eq 0 ]; then exit 1; else exit 0; fi
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify SSH configuration files are owned by root"
+    remediation:
+      commands:
+        - "chown root /etc/ssh/sshd_config"
+        - "find /etc/ssh/sshd_config.d -type f -exec chown root {} +"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set ownership of SSH configuration to root"
+    rollback:
+      commands:
+        - "# Manual rollback required (identify previous owner)"
+      description: "Manual rollback required"

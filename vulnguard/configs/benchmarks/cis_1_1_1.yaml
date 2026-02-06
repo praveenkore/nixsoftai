@@ -1,6 +1,7 @@
 # CIS Benchmark Rule
 # CIS Ubuntu Linux 20.04 LTS Benchmark v2.0.0
 # Rule 1.1.1: Ensure mounting of cramfs filesystems is disabled
+# OS Support: Universal - modprobe behavior is consistent across all Linux distributions
 
 benchmark: CIS
 id: "1.1.1"
@@ -9,8 +10,13 @@ rationale: "The cramfs filesystem type is a compressed read-only Linux filesyste
 severity: medium
 original_severity: Level2
 os_compatibility:
+  # Universal check - modprobe is available on all Linux distributions
   - ubuntu
   - debian
+  - rhel
+  - centos
+  - almalinux
+  - rocky
 
 check:
   type: command

@@ -1,0 +1,37 @@
+benchmark: STIG
+id: "V-269111"
+title: "AlmaLinux OS 9 must log SSH connection attempts and failures to the server."
+stig_id: "ALMA-09-002770"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000067
+srg: SRG-OS-000032-GPOS-00013
+
+rationale: |
+  Remote access services, such as those providing remote access to network devices and information
+  systems, which lack automated monitoring capabilities, increase risk, and make remote user access
+  management difficult at best. Automated monitoring of remote access sessions allows organizations
+  to detect cyber attacks and also ensure ongoing compliance with remote access policies by auditing
+  connection activities of remote access capabilities.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sshd", "-T"]
+      expected_state: "contains"
+      expected_value: "loglevel VERBOSE"
+      description: "Verify SSH LogLevel is set to VERBOSE"
+    remediation:
+      commands:
+        - "echo 'LogLevel VERBOSE' > /etc/ssh/sshd_config.d/40-loglevel.conf"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure SSH daemon to log at VERBOSE level"
+      service_restart: "sshd"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-loglevel.conf"
+      description: "Remove LogLevel VERBOSE configuration"
+      service_restart: "sshd"

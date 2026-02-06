@@ -1,0 +1,53 @@
+benchmark: STIG
+id: "V-269182"
+title: "AlmaLinux OS 9 must disable the kernel.core_pattern."
+stig_id: "ALMA-09-011680"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Setting kernel.core_pattern to |/bin/false is the most effective way to prevent the kernel
+  from writing a core dump to the filesystem.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: sysctl
+      key: "kernel.core_pattern"
+      expected_value: "|/bin/false"
+      description: "Verify kernel.core_pattern is |/bin/false"
+    remediation:
+      commands:
+        - "echo 'kernel.core_pattern = |/bin/false' > /etc/sysctl.d/50-coredump.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set kernel.core_pattern via sysctl"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/50-coredump.conf"
+        - "sysctl -w kernel.core_pattern=core"
+      description: "Reset kernel.core_pattern"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: sysctl
+      key: "kernel.core_pattern"
+      expected_value: "|/bin/false"
+      description: "Verify kernel.core_pattern is |/bin/false"
+    remediation:
+      commands:
+        - "echo 'kernel.core_pattern = |/bin/false' > /etc/sysctl.d/50-coredump.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set kernel.core_pattern via sysctl"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/50-coredump.conf"
+        - "sysctl -w kernel.core_pattern=core"
+      description: "Reset kernel.core_pattern"

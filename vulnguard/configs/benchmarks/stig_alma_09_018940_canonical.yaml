@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269247"
+title: "AlmaLinux OS 9 must limit the number of bogus Internet Control Message Protocol (ICMP) response errors logs."
+stig_id: "ALMA-09-018940"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269247"
+
+rationale: |
+  Ignoring bogus ICMP error responses reduces log size and prevents log flooding attacks.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "net.ipv4.icmp_ignore_bogus_error_responses"]
+      expected_state: "exact"
+      expected_value: "net.ipv4.icmp_ignore_bogus_error_responses = 1"
+      description: "Verify net.ipv4.icmp_ignore_bogus_error_responses is 1"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.icmp_ignore_bogus_error_responses = 1' > /etc/sysctl.d/99-stig-icmp-bogus.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable ignore bogus ICMP error responses via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-icmp-bogus.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

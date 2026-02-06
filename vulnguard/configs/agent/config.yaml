@@ -62,7 +62,7 @@ command_blocklist:
 # AI Advisor configuration
 ai:
   enabled: true
-  provider: "openai"  # Options: openai, anthropic, openrouter, local, ollama, mock
+  provider: "openrouter"  # Options: openai, anthropic, openrouter, local, ollama, mock
   min_confidence_threshold: 0.7
   require_approval_for:
     - "CAT_I"
@@ -75,10 +75,20 @@ ai:
   openai:
     api_key: "${OPENAI_API_KEY}"  # Set via environment variable
     model: "gpt-4-turbo-preview"
-    api_endpoint: "https://api.openai.com/v1/chat/completions"
+    api_endpoint: "https://api.openai.com/v1/chat/completions"  # or base_url: "https://api.openai.com/v1"
     max_tokens: 2000
     temperature: 0.3
-  
+
+  # OpenRouter Configuration (when provider: openrouter)
+  openrouter:
+    api_key: "${OPENROUTER_API_KEY}"  # Set via environment variable
+    model: "z-ai/glm-4.5-air:free" #"openai/gpt-4-turbo"   for free tier
+    api_endpoint: "https://openrouter.ai/api/v1/chat/completions"  # or base_url: "https://openrouter.ai/api/v1"
+    site_url: "https://openrouter.ai"  # Optional: Your site URL for OpenRouter rankings
+    site_name: "VulnGuard Security Compliance Agent"  # Optional: Your site name for rankings
+    max_tokens: 2000
+    temperature: 0.3
+
   # Anthropic Configuration (when provider: anthropic)
   anthropic:
     api_key: "${ANTHROPIC_API_KEY}"  # Set via environment variable

@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269142"
+title: "AlmaLinux OS 9 must have the sudo package installed."
+stig_id: "ALMA-09-006840"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002235
+srg: SRG-OS-000324-GPOS-00125
+
+rationale: |
+  Sudo allows authorized users to perform administrative tasks without logging in as root.
+  It provides audit trails and granular privilege control.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["rpm", "-q", "sudo"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify sudo package is installed"
+    remediation:
+      commands:
+        - "dnf install -y sudo"
+      requires_restart: false
+      requires_reboot: false
+      description: "Install sudo via dnf"
+    rollback:
+      commands:
+        - "dnf remove -y sudo"
+      description: "Remove sudo package (Warning: reduces admin capability)"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["dpkg", "-s", "sudo"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify sudo package is installed"
+    remediation:
+      commands:
+        - "apt-get install -y sudo"
+      requires_restart: false
+      requires_reboot: false
+      description: "Install sudo via apt"
+    rollback:
+      commands:
+        - "apt-get remove -y sudo"
+      description: "Remove sudo package"

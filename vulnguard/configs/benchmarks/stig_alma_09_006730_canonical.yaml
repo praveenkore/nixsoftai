@@ -1,0 +1,55 @@
+benchmark: STIG
+id: "V-269141"
+title: "The Ctrl-Alt-Delete key sequence must be disabled on AlmaLinux OS 9."
+stig_id: "ALMA-09-006730"
+original_severity: "CAT I"
+severity: high
+cci: CCI-002235
+srg: SRG-OS-000324-GPOS-00125
+
+rationale: |
+  Disabling the Ctrl-Alt-Delete key sequence prevents users from rebooting the system
+  from the console, which protects against accidental or malicious availability loss.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["systemctl", "status", "ctrl-alt-del.target"]
+      expected_state: "contains"
+      expected_value: "masked"
+      description: "Verify ctrl-alt-del.target is masked"
+    remediation:
+      commands:
+        - "systemctl disable --now ctrl-alt-del.target"
+        - "systemctl mask --now ctrl-alt-del.target"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask ctrl-alt-del.target"
+    rollback:
+      commands:
+        - "systemctl unmask --now ctrl-alt-del.target"
+        - "systemctl enable --now ctrl-alt-del.target"
+      description: "Unmask ctrl-alt-del.target"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["systemctl", "status", "ctrl-alt-del.target"]
+      expected_state: "contains"
+      expected_value: "masked"
+      description: "Verify ctrl-alt-del.target is masked"
+    remediation:
+      commands:
+        - "systemctl disable --now ctrl-alt-del.target"
+        - "systemctl mask --now ctrl-alt-del.target"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask ctrl-alt-del.target"
+    rollback:
+      commands:
+        - "systemctl unmask --now ctrl-alt-del.target"
+        - "systemctl enable --now ctrl-alt-del.target"
+      description: "Unmask ctrl-alt-del.target"

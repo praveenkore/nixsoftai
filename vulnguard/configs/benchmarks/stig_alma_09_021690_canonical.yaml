@@ -1,0 +1,35 @@
+benchmark: STIG
+id: "V-269272"
+title: "If the Trivial File Transfer Protocol (TFTP) server is required, the TFTP daemon must be configured to operate in secure mode."
+stig_id: "ALMA-09-021690"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269272"
+
+rationale: |
+  Restricting TFTP to a specific directory prevents remote users from copying, transferring, or overwriting system files. Using the \"-s\" option causes the TFTP service to only serve files from the given directory.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["rpm", "-q", "tftp-server"]
+      script: |
+        if ! rpm -q tftp-server >/dev/null 2>&1; then exit 0; fi # Not Applicable
+        systemctl cat tftp.service | grep ExecStart= | grep -q " -s "
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify TFTP is configured with -s option if installed"
+    remediation:
+      commands:
+        - "# Manual remediation: systemctl edit tftp.service and add -s <directory> to ExecStart"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure TFTP secure mode manually"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

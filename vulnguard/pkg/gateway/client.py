@@ -3,42 +3,150 @@
 Gateway Client.
 
 Handles communication with the Centralized C2 Server.
-Supports pushing JSON reports securely.
+Supports pushing JSON reports securely with TLS certificate pinning.
 """
 
+import hashlib
 import json
 import logging
+import ssl
 from typing import Any, Dict, Optional
 import httpx
 from vulnguard.pkg.logging.logger import AuditLogger
 from vulnguard.pkg.gateway.exceptions import (
     GatewayConnectionError,
     GatewayAuthenticationError,
-    GatewayPayloadError
+    GatewayPayloadError,
+    GatewaySecurityError
 )
 
 class GatewayClient:
     """
     Client for communicating with the VulnGuard C2 Server.
+    
+    Supports TLS certificate pinning for enhanced security.
     """
     def __init__(
         self,
         server_url: str,
         api_key: Optional[str] = None,
         verify_ssl: bool = True,
-        logger: Optional[AuditLogger] = None
+        logger: Optional[AuditLogger] = None,
+        pinned_cert_fingerprint: Optional[str] = None,
+        fingerprint_algorithm: str = "sha256"
     ):
+        """
+        Initialize the Gateway client.
+        
+        Args:
+            server_url: URL of the C2 server
+            api_key: API key for authentication
+            verify_ssl: Whether to verify SSL certificates
+            logger: Optional audit logger instance
+            pinned_cert_fingerprint: Optional SHA-256 fingerprint of the expected server certificate
+            fingerprint_algorithm: Hash algorithm for certificate fingerprint (default: sha256)
+        """
         self.server_url = server_url.rstrip('/')
         self.api_key = api_key
         self.verify_ssl = verify_ssl
         self.logger = logger or AuditLogger()
+        self.pinned_cert_fingerprint = pinned_cert_fingerprint
+        self.fingerprint_algorithm = fingerprint_algorithm
+        
+        # Create SSL context with certificate pinning if fingerprint provided
+        ssl_context = self._create_ssl_context() if verify_ssl else False
         
         # Initialize HTTP client
         self.client = httpx.Client(
             base_url=self.server_url,
-            verify=self.verify_ssl,
+            verify=ssl_context if ssl_context else verify_ssl,
             timeout=30.0
         )
+    
+    def _create_ssl_context(self) -> ssl.SSLContext:
+        """
+        Create an SSL context with certificate pinning support.
+        
+        Returns:
+            SSLContext configured with certificate pinning
+        """
+        context = ssl.create_default_context()
+        
+        if self.pinned_cert_fingerprint:
+            # Wrap the original wrap_socket to add fingerprint verification
+            original_wrap_socket = context.wrap_socket
+            
+            def wrap_socket_with_pinning(*args, **kwargs):
+                sock = original_wrap_socket(*args, **kwargs)
+                
+                # Get the peer certificate in binary form
+                cert_binary = sock.getpeercert(binary_form=True)
+                if cert_binary:
+                    # Calculate fingerprint
+                    if self.fingerprint_algorithm.lower() == "sha256":
+                        fingerprint = hashlib.sha256(cert_binary).hexdigest()
+                    elif self.fingerprint_algorithm.lower() == "sha1":
+                        fingerprint = hashlib.sha1(cert_binary).hexdigest()
+                    else:
+                        fingerprint = hashlib.new(
+                            self.fingerprint_algorithm, 
+                            cert_binary
+                        ).hexdigest()
+                    
+                    # Verify fingerprint matches expected value
+                    expected = self.pinned_cert_fingerprint.lower().replace(':', '').replace(' ', '')
+                    actual = fingerprint.lower()
+                    
+                    if actual != expected:
+                        self.logger.log_error(
+                            "gateway_security",
+                            f"Certificate pinning failed. Expected: {expected}, Got: {actual}"
+                        )
+                        raise GatewaySecurityError(
+                            f"Certificate pinning failed. Expected: {expected}, Got: {actual}"
+                        )
+                    
+                    self.logger.log_info(
+                        f"Certificate pinning verification successful for {self.server_url}"
+                    )
+                
+                return sock
+            
+            context.wrap_socket = wrap_socket_with_pinning
+        
+        return context
+    
+    def verify_certificate_pinning(self) -> bool:
+        """
+        Verify that the server certificate matches the pinned fingerprint.
+        
+        Returns:
+            True if pinning verification succeeds or no pinning is configured
+            
+        Raises:
+            GatewaySecurityError: If certificate pinning verification fails
+        """
+        if not self.pinned_cert_fingerprint:
+            return True
+        
+        try:
+            # Make a test connection to verify the certificate
+            test_client = httpx.Client(
+                base_url=self.server_url,
+                verify=self._create_ssl_context(),
+                timeout=10.0
+            )
+            test_client.get("/")
+            test_client.close()
+            return True
+        except GatewaySecurityError:
+            raise
+        except Exception as e:
+            self.logger.log_error(
+                "gateway_security",
+                f"Failed to verify certificate pinning: {str(e)}"
+            )
+            raise GatewaySecurityError(f"Certificate pinning verification failed: {str(e)}")
 
     def _get_headers(self) -> Dict[str, str]:
         """Generate headers for the request."""

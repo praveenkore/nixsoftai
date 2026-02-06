@@ -1,0 +1,55 @@
+benchmark: STIG
+id: "V-269120"
+title: "AlmaLinux OS 9 must force a frequent session key renegotiation for SSH connections to the server."
+stig_id: "ALMA-09-003650"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000068
+srg: SRG-OS-000033-GPOS-00014
+
+rationale: |
+  Session key regeneration limits the chances of a session key becoming compromised.
+  Frequent renegotiation ensures that if a key is compromised, it is only valid for a short duration.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "RekeyLimit", "/etc/ssh/sshd_config", "/etc/ssh/sshd_config.d/*"]
+      expected_state: "contains"
+      expected_value: "RekeyLimit 1G 1h"
+      description: "Verify RekeyLimit is set to 1G 1h in SSH configuration"
+    remediation:
+      commands:
+        - "echo 'RekeyLimit 1G 1h' > /etc/ssh/sshd_config.d/40-rekeylimit.conf"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure RekeyLimit in sshd_config.d"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-rekeylimit.conf"
+        - "systemctl reload sshd"
+      description: "Remove RekeyLimit configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-i", "RekeyLimit", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "RekeyLimit 1G 1h"
+      description: "Verify RekeyLimit is set to 1G 1h in SSH configuration"
+    remediation:
+      commands:
+        - "echo 'RekeyLimit 1G 1h' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure RekeyLimit in sshd_config"
+    rollback:
+      commands:
+        - "sed -i '/RekeyLimit 1G 1h/d' /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      description: "Remove RekeyLimit configuration"

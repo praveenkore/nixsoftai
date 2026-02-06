@@ -1,0 +1,57 @@
+benchmark: STIG
+id: "V-269162"
+title: "AlmaLinux OS 9 SSH daemon must not allow Kerberos authentication."
+stig_id: "ALMA-09-009480"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001813
+srg: SRG-OS-000364-GPOS-00151
+
+rationale: |
+  Kerberos authentication for SSH is often implemented using GSSAPI.
+  If Kerberos is enabled, it provides an additional attack vector via the system's Kerberos implementation.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "^KerberosAuthentication no", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "KerberosAuthentication no"
+      description: "Verify KerberosAuthentication is set to no in sshd_config"
+    remediation:
+      commands:
+        - "sed -i '/^KerberosAuthentication/d' /etc/ssh/sshd_config"
+        - "echo 'KerberosAuthentication no' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable KerberosAuthentication in sshd_config"
+    rollback:
+      commands:
+        - "sed -i '/^KerberosAuthentication no/d' /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      description: "Revert KerberosAuthentication setting"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-i", "^KerberosAuthentication no", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "KerberosAuthentication no"
+      description: "Verify KerberosAuthentication is set to no in sshd_config"
+    remediation:
+      commands:
+        - "sed -i '/^KerberosAuthentication/d' /etc/ssh/sshd_config"
+        - "echo 'KerberosAuthentication no' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable KerberosAuthentication in sshd_config"
+    rollback:
+      commands:
+        - "sed -i '/^KerberosAuthentication no/d' /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      description: "Revert KerberosAuthentication setting"

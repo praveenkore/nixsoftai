@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269143"
+title: "The AlmaLinux OS 9 debug-shell systemd service must be disabled."
+stig_id: "ALMA-09-006950"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002235
+srg: SRG-OS-000324-GPOS-00125
+
+rationale: |
+  The debug-shell service opens a root shell on tty9 without authentication.
+  Leaving it enabled allows anyone with physical access to gain root privileges easily.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["systemctl", "status", "debug-shell.service"]
+      expected_state: "contains"
+      expected_value: "masked"
+      description: "Verify debug-shell.service is masked"
+    remediation:
+      commands:
+        - "systemctl mask --now debug-shell.service"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask debug-shell.service"
+    rollback:
+      commands:
+        - "systemctl unmask --now debug-shell.service"
+      description: "Unmask debug-shell.service (Warning: insecure)"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["systemctl", "status", "debug-shell.service"]
+      expected_state: "contains"
+      expected_value: "masked"
+      description: "Verify debug-shell.service is masked"
+    remediation:
+      commands:
+        - "systemctl mask --now debug-shell.service"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask debug-shell.service"
+    rollback:
+      commands:
+        - "systemctl unmask --now debug-shell.service"
+      description: "Unmask debug-shell.service"

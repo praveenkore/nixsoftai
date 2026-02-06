@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269166"
+title: "AlmaLinux OS 9 must check the GPG signature of repository metadata before package installation."
+stig_id: "ALMA-09-009920"
+original_severity: "CAT I"
+severity: high
+cci: CCI-003992
+srg: SRG-OS-000366-GPOS-00153
+
+rationale: |
+  Verifying repository metadata ensures that the repository itself hasn't been tampered with.
+  'repo_gpgcheck=1' in dnf.conf enforces this globally.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^repo_gpgcheck=1", "/etc/dnf/dnf.conf"]
+      expected_state: "contains"
+      expected_value: "repo_gpgcheck=1"
+      description: "Verify repo_gpgcheck is enabled in dnf.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^repo_gpgcheck.*/repo_gpgcheck=1/' /etc/dnf/dnf.conf"
+        - "grep -q '^repo_gpgcheck=1' /etc/dnf/dnf.conf || echo 'repo_gpgcheck=1' >> /etc/dnf/dnf.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable repo_gpgcheck in dnf.conf"
+    rollback:
+      commands:
+        - "sed -i '/^repo_gpgcheck=1/d' /etc/dnf/dnf.conf"
+      description: "Remove repo_gpgcheck configuration"

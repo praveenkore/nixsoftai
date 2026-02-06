@@ -3,21 +3,31 @@ id: "V-230267"
 title: "The operating system must produce audit records containing information to establish the source of the events."
 severity: high
 original_severity: "CAT II"
+# Universal - auditd is available on all distributions (use appropriate package manager)
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Auditd must be installed and configured to collect security-relevant events for forensic analysis and compliance."
 check:
   type: command
-  command: "dpkg -l | grep -q '^ii  auditd'"
+  command: "rpm -q auditd"
   expected_state: "0"
 remediation:
   commands:
-    - "DEBIAN_FRONTEND=noninteractive apt-get install -y auditd audispd-plugins"
+    - "yum install -y auditd audispd-plugins"
+    - "systemctl enable auditd"
+    - "systemctl start auditd"
   requires_restart: false
   requires_reboot: false
 rollback:
   commands:
-    - "DEBIAN_FRONTEND=noninteractive apt-get remove -y auditd audispd-plugins"
+    - "systemctl stop auditd"
+    - "systemctl disable auditd"
+    - "yum remove -y auditd audispd-plugins"
 ai_assist: false
 approval_required: true
 exception_allowed: true

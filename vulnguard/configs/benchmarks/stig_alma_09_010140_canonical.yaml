@@ -1,0 +1,53 @@
+benchmark: STIG
+id: "V-269168"
+title: "AlmaLinux OS 9 must prevent the loading of a new kernel for later execution."
+stig_id: "ALMA-09-010140"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-003992
+srg: SRG-OS-000366-GPOS-00153
+
+rationale: |
+  Disabling kexec_load prevents the loading of an unsigned new kernel image into memory,
+  which could bypass Secure Boot protections.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: sysctl
+      key: "kernel.kexec_load_disabled"
+      expected_value: "1"
+      description: "Verify kernel.kexec_load_disabled is set to 1"
+    remediation:
+      commands:
+        - "echo 'kernel.kexec_load_disabled = 1' > /etc/sysctl.d/kexec.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable kexec load via sysctl"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/kexec.conf"
+        - "sysctl -w kernel.kexec_load_disabled=0"
+      description: "Re-enable kexec load"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: sysctl
+      key: "kernel.kexec_load_disabled"
+      expected_value: "1"
+      description: "Verify kernel.kexec_load_disabled is set to 1"
+    remediation:
+      commands:
+        - "echo 'kernel.kexec_load_disabled = 1' > /etc/sysctl.d/kexec.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable kexec load via sysctl"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/kexec.conf"
+        - "sysctl -w kernel.kexec_load_disabled=0"
+      description: "Re-enable kexec load"

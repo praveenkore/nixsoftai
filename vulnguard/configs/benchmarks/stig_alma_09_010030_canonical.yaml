@@ -1,0 +1,31 @@
+benchmark: STIG
+id: "V-269167"
+title: "AlmaLinux OS 9 must have GPG signature verification enabled for all software repositories."
+stig_id: "ALMA-09-010030"
+original_severity: "CAT I"
+severity: high
+cci: CCI-003992
+srg: SRG-OS-000366-GPOS-00153
+
+rationale: |
+  Each individual repository configuration in /etc/yum.repos.d/ must have 'gpgcheck=1' enabled.
+  This ensures verification is not disabled per-repo.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "gpgcheck=0", "/etc/yum.repos.d/*.repo"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify no repo has gpgcheck=0"
+    remediation:
+      commands:
+        - "sed -i 's/gpgcheck=0/gpgcheck=1/g' /etc/yum.repos.d/*.repo"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enforce gpgcheck=1 in all repo files"
+    rollback:
+      commands: []
+      description: "Manual rollback required for repo files"

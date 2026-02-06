@@ -5,6 +5,48 @@
 This directory contains machine-executable STIG benchmark rules derived from the Ubuntu Security Hardening Scripts located at:
 `Ubuntu-Security-Hardening-Script/`
 
+## OS Compatibility
+
+### Supported Operating Systems
+
+All benchmark rules now support multiple Linux distributions across both Debian and RHEL families:
+
+**Debian-based:**
+- Ubuntu 18.04+
+- Debian 10+
+
+**RHEL-based:**
+- RHEL 8+
+- CentOS 8+
+- AlmaLinux 8+
+- Rocky Linux 8+
+
+### OS Detection
+
+VulnGuard uses OS family detection to determine compatibility. The scanner matches the detected
+OS against the `os_compatibility` field in each rule. This allows rules to be applied to the
+appropriate distributions while maintaining backward compatibility.
+
+### Universal vs Distribution-Specific Rules
+
+**Universal Rules:**
+- Kernel parameter checks (sysctl) - work across all Linux distributions
+- SSH configuration checks - sshd_config is consistent across distributions
+- Module loading checks (modprobe) - available on all distributions
+
+**Distribution-Specific Rules:**
+- Package manager checks (dpkg/apt-get for Debian, rpm/dnf for RHEL)
+- Firewall checks (UFW for Debian-based, firewalld for RHEL-based)
+- MAC system checks (AppArmor for Debian, SELinux for RHEL)
+- Auto-update configuration (apt vs dnf/yum)
+
+### Rule Compatibility Notes
+
+Some rules include compatibility notes in their YAML comments indicating:
+- Universal checks that work on all distributions
+- Distribution-specific tools that may require different package managers
+- Alternative tools available on different distributions (e.g., UFW vs firewalld)
+
 ## Scripts Analyzed
 
 1. **ubuntu-hardening-original.sh** (Version 2.0) - Ubuntu 18.04/20.04/22.04

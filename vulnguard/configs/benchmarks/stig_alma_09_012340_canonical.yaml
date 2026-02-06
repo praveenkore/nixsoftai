@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269188"
+title: "AlmaLinux OS 9 must prevent a user from overriding the Ctrl-Alt-Del sequence settings for the graphical user interface."
+stig_id: "ALMA-09-012340"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Users must not be able to override the Ctrl-Alt-Del setting. Locking the dconf setting ensures enforcement.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "org/gnome/settings-daemon/plugins/media-keys/logout", "/etc/dconf/db/local.d/locks/*"]
+      expected_state: "contains"
+      expected_value: "/org/gnome/settings-daemon/plugins/media-keys/logout"
+      description: "Verify logout key is locked"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d/locks"
+        - "echo '/org/gnome/settings-daemon/plugins/media-keys/logout' >> /etc/dconf/db/local.d/locks/session"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Lock GNOME logout setting"
+    rollback:
+      commands:
+        - "sed -i 's|/org/gnome/settings-daemon/plugins/media-keys/logout||' /etc/dconf/db/local.d/locks/session"
+        - "dconf update"
+      description: "Unlock GNOME logout setting"

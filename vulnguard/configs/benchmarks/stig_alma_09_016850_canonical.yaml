@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269228"
+title: "AlmaLinux OS 9 /etc/shadow- file must have mode 0000 or less permissive to prevent unauthorized access."
+stig_id: "ALMA-09-016850"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269228"
+
+rationale: |
+  The "/etc/shadow-" file is a backup file of "/etc/shadow", and as such, contains the list of local system accounts and password hashes. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%a %n", "/etc/shadow-"]
+      expected_state: "contains"
+      expected_value: "0 /etc/shadow-"
+      description: "Verify that /etc/shadow- has mode 0000"
+    remediation:
+      commands:
+        - "chmod 0000 /etc/shadow-"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set mode of /etc/shadow- to 0000"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert permissions change"

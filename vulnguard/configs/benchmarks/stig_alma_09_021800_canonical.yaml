@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269273"
+title: "AlmaLinux OS 9 must enable hardening for the Berkeley Packet Filter (BPF) just-in-time (JIT) compiler."
+stig_id: "ALMA-09-021800"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269273"
+
+rationale: |
+  When hardened, the extended BPF JIT compiler will randomize any kernel addresses in the BPF programs and maps, and will not expose the JIT addresses in \"/proc/kallsyms\".
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "net.core.bpf_jit_harden"]
+      expected_state: "exact"
+      expected_value: "net.core.bpf_jit_harden = 2"
+      description: "Verify net.core.bpf_jit_harden is set to 2"
+    remediation:
+      commands:
+        - "echo 'net.core.bpf_jit_harden = 2' > /etc/sysctl.d/99-stig-bpf-harden.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable BPF JIT hardening via sysctl"
+    rollback:
+      commands:
+        - "rm -f /etc/sysctl.d/99-stig-bpf-harden.conf"
+        - "sysctl --system"
+      description: "Remove BPF JIT hardening"

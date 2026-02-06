@@ -1,0 +1,40 @@
+benchmark: STIG
+id: "V-269249"
+title: "AlmaLinux OS 9 must not enable IP packet forwarding unless the system is a router."
+stig_id: "ALMA-09-019160"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269249"
+
+rationale: |
+  Routing protocol daemons are typically used on routers to exchange network topology information with other routers. If this capability is used when not required, system network information may be unnecessarily transmitted across the network.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "-a"]
+      script: |
+        sysctl -a | grep forwarding | grep -v 'mc_forwarding' | awk '{if ($3 != 0) exit 1}'
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify all IP forwarding sysctl values are 0"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.conf.all.forwarding = 0' > /etc/sysctl.d/99-stig-ip-forwarding.conf"
+        - "echo 'net.ipv4.conf.default.forwarding = 0' >> /etc/sysctl.d/99-stig-ip-forwarding.conf"
+        - "echo 'net.ipv6.conf.all.forwarding = 0' >> /etc/sysctl.d/99-stig-ip-forwarding.conf"
+        - "echo 'net.ipv6.conf.default.forwarding = 0' >> /etc/sysctl.d/99-stig-ip-forwarding.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable IP forwarding via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-ip-forwarding.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

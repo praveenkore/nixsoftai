@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269122"
+title: "AlmaLinux OS 9 IP tunnels must use FIPS 140-3 approved cryptographic algorithms."
+stig_id: "ALMA-09-003870"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000068
+srg: SRG-OS-000033-GPOS-00014
+
+rationale: |
+  Libreswan IPsec usually must utilize the system crypto policy to ensure FIPS compliant algorithms are used.
+  Overriding the system policy fragment the security configuration.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "include /etc/crypto-policies/back-ends/libreswan.config", "/etc/ipsec.conf", "/etc/ipsec.d/"]
+      expected_state: "contains"
+      expected_value: "include /etc/crypto-policies/back-ends/libreswan.config"
+      description: "Verify Libreswan includes system crypto policy"
+    remediation:
+      commands:
+        - "echo 'include /etc/crypto-policies/back-ends/libreswan.config' >> /etc/ipsec.conf"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure Libreswan to include system crypto policy"
+    rollback:
+      commands:
+        - "sed -i '|include /etc/crypto-policies/back-ends/libreswan.config|d' /etc/ipsec.conf"
+      description: "Remove system crypto policy include from Libreswan config"

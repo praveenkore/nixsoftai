@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269187"
+title: "AlmaLinux OS 9 must disable the ability of a user to accidentally press Ctrl-Alt-Del and cause a system to shut down or reboot."
+stig_id: "ALMA-09-012230"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Accidental reboots via Ctrl-Alt-Del can cause denial of service. GNOME settings must be configured
+  to ignore this sequence or logout instead of reboot.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["gsettings", "get", "org.gnome.settings-daemon.plugins.media-keys", "logout"]
+      expected_state: "exact"
+      expected_value: "['']"
+      description: "Verify Ctrl-Alt-Del logout action is disabled/cleared"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/settings-daemon/plugins/media-keys]' > /etc/dconf/db/local.d/00-security-settings"
+        - "echo \"logout=['']\" >> /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable Ctrl-Alt-Del action in GNOME"
+    rollback:
+      commands:
+        - "rm -f /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      description: "Remove GNOME security settings"

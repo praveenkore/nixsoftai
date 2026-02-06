@@ -3,24 +3,30 @@ id: "V-230270"
 title: "The operating system must use a Mandatory Access Control (MAC) system to enforce access restrictions."
 severity: high
 original_severity: "CAT II"
+# AppArmor is Ubuntu/Debian specific; SELinux is for RHEL-based systems
+# This rule checks for the appropriate MAC system based on OS
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
-rationale: "AppArmor provides mandatory access control by confining programs to a limited set of files, capabilities, and resources."
+  - debian
+rationale: "Mandatory Access Control (MAC) systems like SELinux or AppArmor enforce security policies that restrict program behavior."
 check:
   type: command
-  command: "dpkg -l | grep -q '^ii  apparmor' && aa-status | grep -q 'profiles are in enforce mode'"
-  expected_state: "0"
+  command: "getenforce"
+  expected_state: "Enforcing"
 remediation:
   commands:
-    - "systemctl enable apparmor"
-    - "systemctl start apparmor"
-    - "aa-enforce /etc/apparmor.d/*"
-  requires_restart: false
-  requires_reboot: false
+    - "setenforce 1"
+    - "sed -i 's/^SELINUX=.*/SELINUX=enforcing/' /etc/selinux/config"
+  requires_restart: true
+  requires_reboot: true
 rollback:
   commands:
-    - "systemctl disable apparmor"
-    - "systemctl stop apparmor"
+    - "setenforce 0"
+    - "sed -i 's/^SELINUX=.*/SELINUX=permissive/' /etc/selinux/config"
 ai_assist: false
 approval_required: true
 exception_allowed: true

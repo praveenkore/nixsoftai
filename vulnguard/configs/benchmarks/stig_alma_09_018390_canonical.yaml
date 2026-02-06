@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269242"
+title: "AlmaLinux OS 9 must prevent the use of dictionary words for passwords."
+stig_id: "ALMA-09-018390"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00008
+vulnerability_id: "V-269242"
+
+rationale: |
+  If the password complexity module is not configured to reject passwords that contain dictionary words, it will be easier for attackers to guess passwords.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "dictcheck", "/etc/security/pwquality.conf"]
+      expected_state: "regex"
+      expected_value: "dictcheck\\s*=\\s*1"
+      description: "Verify dictcheck is enabled in pwquality.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^#*dictcheck.*/dictcheck = 1/' /etc/security/pwquality.conf"
+        - "grep -q '^dictcheck' /etc/security/pwquality.conf || echo 'dictcheck = 1' >> /etc/security/pwquality.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable dictionary check in pwquality.conf"
+    rollback:
+      commands:
+        - "sed -i 's/^dictcheck.*/dictcheck = 0/' /etc/security/pwquality.conf"
+      description: "Disable dictionary check"

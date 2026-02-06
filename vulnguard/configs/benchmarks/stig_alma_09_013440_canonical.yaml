@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269198"
+title: "The /boot/grub2/grub.cfg file must be owned by root."
+stig_id: "ALMA-09-013440"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269198"
+
+rationale: |
+  The "/boot/grub2/grub.cfg" file stores sensitive system configuration. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%U %n", "/boot/grub2/grub.cfg"]
+      expected_state: "contains"
+      expected_value: "root /boot/grub2/grub.cfg"
+      description: "Verify that /boot/grub2/grub.cfg is owned by root"
+    remediation:
+      commands:
+        - "chown root /boot/grub2/grub.cfg"
+      requires_restart: false
+      requires_reboot: false
+      description: "Change owner of /boot/grub2/grub.cfg to root"
+    rollback:
+      commands:
+        - "# Manual rollback required depending on original owner"
+      description: "Revert ownership change (manual)"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%U %n", "/boot/grub/grub.cfg"]
+      expected_state: "contains"
+      expected_value: "root /boot/grub/grub.cfg"
+      description: "Verify that /boot/grub/grub.cfg is owned by root"
+    remediation:
+      commands:
+        - "chown root /boot/grub/grub.cfg"
+      requires_restart: false
+      requires_reboot: false
+      description: "Change owner of /boot/grub/grub.cfg to root"
+    rollback:
+      commands:
+        - "# Manual rollback required depending on original owner"
+      description: "Revert ownership change (manual)"

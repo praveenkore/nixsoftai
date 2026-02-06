@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269248"
+title: "AlmaLinux OS 9 must not respond to Internet Control Message Protocol (ICMP) echoes sent to a broadcast address."
+stig_id: "ALMA-09-019050"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269248"
+
+rationale: |
+  Responding to broadcast (ICMP) echoes facilitates network mapping and provides a vector for amplification attacks.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "net.ipv4.icmp_echo_ignore_broadcasts"]
+      expected_state: "exact"
+      expected_value: "net.ipv4.icmp_echo_ignore_broadcasts = 1"
+      description: "Verify net.ipv4.icmp_echo_ignore_broadcasts is 1"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.icmp_echo_ignore_broadcasts = 1' > /etc/sysctl.d/99-stig-icmp-broadcast.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable ignore ICMP broadcast via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-icmp-broadcast.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

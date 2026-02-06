@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269253"
+title: "AlmaLinux OS 9 must have the nss-tools package installed."
+stig_id: "ALMA-09-019600"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269253"
+
+rationale: |
+  Network Security Services (NSS) is a set of libraries designed to support cross-platform development of security-enabled client and server applications. The nss-tools package contains command-line tools to manipulate the NSS certificate and key database.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["rpm", "-q", "nss-tools"]
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify nss-tools package is installed"
+    remediation:
+      commands:
+        - "dnf install -y nss-tools"
+      requires_restart: false
+      requires_reboot: false
+      description: "Install nss-tools package"
+    rollback:
+      commands:
+        - "dnf remove -y nss-tools"
+      description: "Remove nss-tools package"

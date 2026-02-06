@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269216"
+title: "AlmaLinux OS 9 must not allow unattended or automatic logon via the graphical user interface."
+stig_id: "ALMA-09-015420"
+original_severity: "CAT I"
+severity: high
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00229
+vulnerability_id: "V-269216"
+
+rationale: |
+  Failure to restrict system access to authenticated users negatively impacts operating system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "AutomaticLoginEnable", "/etc/gdm/custom.conf"]
+      expected_state: "contains"
+      expected_value: "AutomaticLoginEnable=false"
+      description: "Verify AutomaticLoginEnable is set to false in /etc/gdm/custom.conf"
+    remediation:
+      commands:
+        - "sed -i 's/^AutomaticLoginEnable=.*/AutomaticLoginEnable=false/' /etc/gdm/custom.conf"
+        - "grep -q '^AutomaticLoginEnable' /etc/gdm/custom.conf || sed -i '/\\[daemon\\]/a AutomaticLoginEnable=false' /etc/gdm/custom.conf"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable automatic login in GDM"
+    rollback:
+      commands:
+        - "sed -i 's/^AutomaticLoginEnable=.*/AutomaticLoginEnable=true/' /etc/gdm/custom.conf"
+      description: "Revert automatic login setting"

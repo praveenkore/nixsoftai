@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269270"
+title: "AlmaLinux OS 9 SSH daemon must disable remote X connections for interactive users."
+stig_id: "ALMA-09-021470"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269270"
+
+rationale: |
+  When X11 forwarding is enabled, there may be additional exposure to the server and client displays if the sshd proxy display is configured to listen on the wildcard address.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sshd", "-T"]
+      script: |
+        sshd -T | grep -i "^x11forwarding" | grep "^x11forwarding no"
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify X11Forwarding is set to no"
+    remediation:
+      commands:
+        - "if [ -d /etc/ssh/sshd_config.d ]; then echo 'X11forwarding no' > /etc/ssh/sshd_config.d/40-x11forwarding.conf; else sed -i '/^#*X11Forwarding/c\X11Forwarding no' /etc/ssh/sshd_config; fi"
+        - "systemctl restart sshd.service"
+      requires_restart: true
+      requires_reboot: false
+      description: "Disable X11 forwarding"
+    rollback:
+      commands:
+        - "rm -f /etc/ssh/sshd_config.d/40-x11forwarding.conf"
+        - "systemctl restart sshd.service"
+      description: "Enable X11 forwarding"

@@ -1,0 +1,61 @@
+benchmark: STIG
+id: "V-269146"
+title: "AlmaLinux OS 9 must audit uses of the execve system call."
+stig_id: "ALMA-09-007280"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-002234
+srg: SRG-OS-000327-GPOS-00127
+
+rationale: |
+  Auditing the execve system call is crucial for tracking the execution of privileged commands
+  and analyzing potential security breaches. Use auditctl to trace command execution.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["auditctl", "-l"]
+      expected_state: "contains"
+      expected_value: "execve"
+      description: "Verify execve system call is audited"
+    remediation:
+      commands:
+        - "echo '-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "echo '-a always,exit -F arch=b64 -S execve -C gid!=egid -F egid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "echo '-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "echo '-a always,exit -F arch=b32 -S execve -C gid!=egid -F egid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure audit rules for execve"
+    rollback:
+      commands:
+        - "sed -i '/execve/d' /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      description: "Remove execve audit rules"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["auditctl", "-l"]
+      expected_state: "contains"
+      expected_value: "execve"
+      description: "Verify execve system call is audited"
+    remediation:
+      commands:
+        - "echo '-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "echo '-a always,exit -F arch=b64 -S execve -C gid!=egid -F egid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "echo '-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "echo '-a always,exit -F arch=b32 -S execve -C gid!=egid -F egid=0 -k execpriv' >> /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure audit rules for execve"
+    rollback:
+      commands:
+        - "sed -i '/execve/d' /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      description: "Remove execve audit rules"

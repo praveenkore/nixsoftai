@@ -1,0 +1,40 @@
+benchmark: STIG
+id: "V-269259"
+title: "AlmaLinux OS 9 must not forward source-routed packets."
+stig_id: "ALMA-09-020260"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269259"
+
+rationale: |
+  Source-routed packets allow the source of the packet to suggest routers forward the packet along a different path than configured on the router, which can be used to bypass network security measures. Accepting source-routed packets has few legitimate uses.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["sysctl", "-a"]
+      script: |
+        sysctl -a | grep accept_source_route | awk '{if ($3 != 0) exit 1}'
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify all accept_source_route sysctl values are 0"
+    remediation:
+      commands:
+        - "echo 'net.ipv4.conf.all.accept_source_route = 0' > /etc/sysctl.d/99-stig-source-route.conf"
+        - "echo 'net.ipv4.conf.default.accept_source_route = 0' >> /etc/sysctl.d/99-stig-source-route.conf"
+        - "echo 'net.ipv6.conf.all.accept_source_route = 0' >> /etc/sysctl.d/99-stig-source-route.conf"
+        - "echo 'net.ipv6.conf.default.accept_source_route = 0' >> /etc/sysctl.d/99-stig-source-route.conf"
+        - "sysctl --system"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable source-routed packets via sysctl"
+    rollback:
+      commands:
+        - "rm /etc/sysctl.d/99-stig-source-route.conf"
+        - "sysctl --system"
+      description: "Remove STIG sysctl configuration"

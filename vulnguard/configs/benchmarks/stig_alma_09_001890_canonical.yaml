@@ -1,0 +1,34 @@
+benchmark: STIG
+id: "V-269108"
+title: "AlmaLinux OS 9 must automatically exit interactive command shell user sessions after 10 minutes of inactivity."
+stig_id: "ALMA-09-001890"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000057,CCI-002364,CCI-001133
+srg: SRG-OS-000029-GPOS-00010,SRG-OS-000281-GPOS-00111,SRG-OS-000163-GPOS-00072
+
+rationale: |
+  Terminating an idle interactive command shell user session within a short time period reduces
+  the window of opportunity for unauthorized personnel to take control of it when left unattended
+  in a virtual terminal or physical console. Declaring $TMOUT as read-only means the user cannot
+  override the setting.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "TMOUT", "/etc/profile", "/etc/profile.d/*.sh"]
+      expected_state: "contains"
+      expected_value: "TMOUT=600"
+      description: "Verify TMOUT is set to 600 or less in profile scripts"
+    remediation:
+      commands:
+        - "echo 'declare -xr TMOUT=600' > /etc/profile.d/tmout.sh"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set TMOUT to 600 seconds (10 minutes) as read-only variable"
+    rollback:
+      commands:
+        - "rm -f /etc/profile.d/tmout.sh"
+      description: "Remove TMOUT configuration file"

@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269199"
+title: "AlmaLinux OS 9 must disable the ability of systemd to spawn an interactive boot process."
+stig_id: "ALMA-09-013550"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269199"
+
+rationale: |
+  Using interactive or recovery boot, the console user could disable auditing, firewalls, or other services, weakening system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grubby", "--info=ALL"]
+      expected_state: "not_contains"
+      expected_value: "systemd.confirm_spawn"
+      description: "Verify that systemd.confirm_spawn is not present in GRUB args"
+    remediation:
+      commands:
+        - "grubby --update-kernel=ALL --remove-args='systemd.confirm_spawn'"
+      requires_restart: true
+      requires_reboot: false
+      description: "Remove systemd.confirm_spawn from GRUB configuration"
+    rollback:
+      commands:
+        - "# Manual rollback required to add argument back if needed"
+      description: "Revert GRUB argument change (manual)"

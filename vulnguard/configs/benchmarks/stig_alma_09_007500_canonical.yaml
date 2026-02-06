@@ -1,0 +1,35 @@
+benchmark: STIG
+id: "V-269147"
+title: "AlmaLinux OS 9 must automatically lock an account when three unsuccessful logon attempts occur."
+stig_id: "ALMA-09-007500"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000044
+srg: SRG-OS-000021-GPOS-00005
+
+rationale: |
+  Locking accounts after failed login attempts mitigates brute-force password guessing attacks.
+  The threshold should be set to 3 attempts.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^deny =", "/etc/security/faillock.conf"]
+      expected_state: "contains"
+      expected_value: "deny = 3"
+      description: "Verify deny count is set to 3 in faillock.conf"
+    remediation:
+      commands:
+        - "authselect enable-feature with-faillock"
+        - "sed -i 's/^#deny =.*/deny = 3/' /etc/security/faillock.conf"
+        - "sed -i 's/^deny =.*/deny = 3/' /etc/security/faillock.conf"
+        - "grep -q '^deny = 3' /etc/security/faillock.conf || echo 'deny = 3' >> /etc/security/faillock.conf"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure deny=3 in faillock.conf"
+    rollback:
+      commands:
+        - "sed -i '/^deny = 3/d' /etc/security/faillock.conf"
+      description: "Remove deny configuration"

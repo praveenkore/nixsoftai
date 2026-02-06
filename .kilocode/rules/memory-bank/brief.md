@@ -3,9 +3,9 @@
 ## Project Identity
 
 **Project Name:** VulnGuard - Linux Security Compliance Agent  
-**Version:** 1.0.0  
-**Developer:** Nixsoft Technologies Pvt. Ltd.  
-**License:** GNU General Public License v3 (GPL-3.0)  
+**Version:** 1.2.0
+**Developer:** Nixsoft Technologies Pvt. Ltd.
+**License:** GNU General Public License v3 (GPL-3.0)
 **Repository:** https://github.com/praveenkore/nixsoftai  
 
 ## Core Purpose
@@ -21,6 +21,7 @@ VulnGuard is a production-grade Linux Security Compliance Agent designed for hig
    - Scan systems against DISA STIG standards
    - Support for multiple rule types: command, file, service, sysctl checks
    - OS compatibility filtering (RHEL 8+, Ubuntu 20.04+, CentOS 8+, Debian 10+)
+   - Configurable command timeouts
 
 2. **Deterministic Compliance Engine**
    - All compliance checks must be deterministic and predictable
@@ -51,12 +52,20 @@ VulnGuard is a production-grade Linux Security Compliance Agent designed for hig
    - Complete context in every log entry
 
 6. **Safety Controls**
-   - Command allow-list for allowed operations
-   - Command block-list for dangerous operations
-   - Approval gating for high-risk changes
-   - Fail-safe design (fail-closed)
+    - Command allow-list for allowed operations
+    - Command block-list for dangerous operations
+    - Approval gating for high-risk changes
+    - Fail-safe design (fail-closed)
 
-7. **CLI Interface**
+7. **Multi-Distribution Support (NEW - v1.2.0)**
+    - Canonical rule format with OS family implementations
+    - Single rule file supports multiple distributions
+    - RHEL family: rhel, centos, almalinux, rocky
+    - Debian family: debian, ubuntu
+    - Graceful degradation: Rules without matching OS implementation marked as `not_applicable`
+    - Backward compatibility: Legacy rules continue to work unchanged
+
+8. **CLI Interface**
    - Scan command for compliance checking
    - Remediate command for fixing issues
    - Support for dry-run and commit modes

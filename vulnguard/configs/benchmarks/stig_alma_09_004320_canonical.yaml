@@ -1,0 +1,31 @@
+benchmark: STIG
+id: "V-269126"
+title: "AlmaLinux OS 9 must use the TuxCare FIPS packages and not the default encryption packages."
+stig_id: "ALMA-09-004320"
+original_severity: "CAT I"
+severity: high
+cci: CCI-000068
+srg: SRG-OS-000033-GPOS-00014
+
+rationale: |
+  Standard community packages are not FIPS 140-3 validated.
+  TuxCare FIPS packages must be installed to ensure compliance.
+
+implementations:
+  rhel_family:
+    os: ["almalinux"]
+    check:
+      type: command
+      command: ["rpm -qa | grep -E '^(gnutls|nettle|nss|openssl|libgcrypt|kernel)-[0-9]+' | grep -v tuxcare"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify no non-TuxCare crypto packages are installed"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Install TuxCare FIPS packages via licensed repository'"
+      requires_restart: true
+      requires_reboot: true
+      description: "Placeholder for manual TuxCare package installation"
+    rollback:
+      commands: []
+      description: "Manual rollback required"

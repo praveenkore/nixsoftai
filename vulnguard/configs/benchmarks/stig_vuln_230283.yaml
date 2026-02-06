@@ -3,8 +3,14 @@ id: "V-230283"
 title: "The SSH daemon must not permit TCP forwarding."
 severity: medium
 original_severity: "CAT III"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "TCP forwarding can be exploited for unauthorized access to internal network services."
 check:
   type: file

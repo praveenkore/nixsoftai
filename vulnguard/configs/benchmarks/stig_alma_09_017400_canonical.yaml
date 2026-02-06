@@ -1,0 +1,40 @@
+benchmark: STIG
+id: "V-269233"
+title: "AlmaLinux OS 9 must use the invoking user's password for privilege escalation when using \"sudo\"."
+stig_id: "ALMA-09-017400"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269233"
+
+rationale: |
+  If the rootpw, targetpw, or runaspw flags are defined and not disabled, by default the operating system will prompt the invoking user for the "root" user password.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        grep -E '(!rootpw|!targetpw|!runaspw)' /etc/sudoers /etc/sudoers.d/* | grep -v '#' | wc -l | grep -q '3'
+        if [ $? -eq 0 ]; then
+             exit 0 # Found all 3
+        fi
+        exit 1 # Did not find all 3
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify !rootpw, !targetpw, and !runaspw are set in sudoers"
+    remediation:
+      commands:
+        - "echo 'Defaults !targetpw' > /etc/sudoers.d/01_stig"
+        - "echo 'Defaults !rootpw' >> /etc/sudoers.d/01_stig"
+        - "echo 'Defaults !runaspw' >> /etc/sudoers.d/01_stig"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set !targetpw, !rootpw, and !runaspw in sudoers"
+    rollback:
+      commands:
+        - "rm /etc/sudoers.d/01_stig"
+      description: "Remove STIG sudoers configuration"

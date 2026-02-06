@@ -3,27 +3,35 @@ id: "V-230274"
 title: "The operating system must have a host-based firewall installed and enabled."
 severity: high
 original_severity: "CAT II"
+# Firewall is required on all distributions (firewalld for RHEL-based, ufw for Debian-based)
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
-rationale: "UFW (Uncomplicated Firewall) provides network-level protection by controlling inbound and outbound traffic."
+  - debian
+rationale: "A host-based firewall provides network-level protection by controlling inbound and outbound traffic."
 check:
   type: command
-  command: "dpkg -l | grep -q '^ii  ufw' && ufw status | grep -q 'Status: active'"
-  expected_state: "0"
+  command: "systemctl is-active firewalld"
+  expected_state: "active"
 remediation:
   commands:
-    - "DEBIAN_FRONTEND=noninteractive apt-get install -y ufw"
-    - "ufw --force reset"
-    - "ufw default deny incoming"
-    - "ufw default allow outgoing"
-    - "ufw default deny routed"
-    - "ufw limit 22/tcp comment 'SSH rate limit'"
-    - "echo 'y' | ufw enable"
+    - "yum install -y firewalld"
+    - "systemctl enable firewalld"
+    - "systemctl start firewalld"
+    - "firewall-cmd --set-default-zone=drop"
+    - "firewall-cmd --permanent --zone=drop --add-interface=eth0"
+    - "firewall-cmd --permanent --add-service=ssh"
+    - "firewall-cmd --reload"
   requires_restart: false
   requires_reboot: false
 rollback:
   commands:
-    - "ufw --force reset"
+    - "systemctl stop firewalld"
+    - "systemctl disable firewalld"
+    - "yum remove -y firewalld"
 ai_assist: false
 approval_required: true
 exception_allowed: true

@@ -3,8 +3,14 @@ id: "V-230282"
 title: "The SSH daemon must not permit X11 forwarding."
 severity: medium
 original_severity: "CAT III"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "X11 forwarding can be exploited for unauthorized access to the X11 display server."
 check:
   type: file

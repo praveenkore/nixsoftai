@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269236"
+title: "AlmaLinux OS 9 must define default permissions for PAM users."
+stig_id: "ALMA-09-017730"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00228
+vulnerability_id: "V-269236"
+
+rationale: |
+  Setting the most restrictive default permissions ensures that when new accounts are created they do not have unnecessary access.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "pam_umask.so", "/etc/pam.d/postlogin"]
+      expected_state: "contains"
+      expected_value: "pam_umask.so"
+      description: "Verify pam_umask.so is configured in /etc/pam.d/postlogin"
+    remediation:
+      commands:
+        - "grep -q 'pam_umask.so' /etc/pam.d/postlogin || echo 'session optional pam_umask.so silent' >> /etc/pam.d/postlogin"
+      requires_restart: false
+      requires_reboot: false
+      description: "Enable pam_umask in postlogin"
+    rollback:
+      commands:
+        - "sed -i '/pam_umask.so/d' /etc/pam.d/postlogin"
+      description: "Remove pam_umask configuration"

@@ -1,0 +1,59 @@
+benchmark: STIG
+id: "V-269109"
+title: "AlmaLinux OS 9 must be able to directly initiate a session lock for all connection types using smart card when the smart card is removed."
+stig_id: "ALMA-09-002000"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000056
+srg: SRG-OS-000028-GPOS-00009
+
+rationale: |
+  A session lock is a temporary action taken when a user stops work and moves away.
+  Removing a smart card is a strong indicator that the user has left, and the session should execute a lock-screen action.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "removal-action='lock-screen'", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "removal-action='lock-screen'"
+      description: "Verify 'removal-action' is set to 'lock-screen' in dconf"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/settings-daemon/peripherals/smartcard]' >> /etc/dconf/db/local.d/00-security-settings"
+        - "echo \"removal-action='lock-screen'\" >> /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure smart card removal action to lock screen"
+    rollback:
+      commands:
+        - "sed -i \"/removal-action='lock-screen'/d\" /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      description: "Remove smart card removal action configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "removal-action='lock-screen'", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "removal-action='lock-screen'"
+      description: "Verify 'removal-action' is set to 'lock-screen' in dconf"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/settings-daemon/peripherals/smartcard]' >> /etc/dconf/db/local.d/00-security-settings"
+        - "echo \"removal-action='lock-screen'\" >> /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure smart card removal action to lock screen"
+    rollback:
+      commands:
+        - "sed -i \"/removal-action='lock-screen'/d\" /etc/dconf/db/local.d/00-security-settings"
+        - "dconf update"
+      description: "Remove smart card removal action configuration"

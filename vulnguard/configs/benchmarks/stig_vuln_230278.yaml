@@ -3,8 +3,14 @@ id: "V-230278"
 title: "The SSH daemon must limit the number of authentication attempts."
 severity: high
 original_severity: "CAT II"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Limiting authentication attempts protects against brute force attacks by locking out attackers after multiple failed attempts."
 check:
   type: file

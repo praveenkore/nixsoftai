@@ -3,8 +3,14 @@ id: "V-230277"
 title: "The SSH daemon must use protocol 2."
 severity: high
 original_severity: "CAT II"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "SSH protocol 1 is deprecated and has known vulnerabilities. Protocol 2 provides stronger security features."
 check:
   type: file

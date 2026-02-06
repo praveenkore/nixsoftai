@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269223"
+title: "AlmaLinux OS 9 /etc/passwd file must be group-owned by root."
+stig_id: "ALMA-09-016300"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269223"
+
+rationale: |
+  The "/etc/passwd" file contains information about the users that are configured on the system. Protection of this file is critical for system security.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%G %n", "/etc/passwd"]
+      expected_state: "contains"
+      expected_value: "root /etc/passwd"
+      description: "Verify that /etc/passwd is group-owned by root"
+    remediation:
+      commands:
+        - "chgrp root /etc/passwd"
+      requires_restart: false
+      requires_reboot: false
+      description: "Change group owner of /etc/passwd to root"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Revert group ownership change"

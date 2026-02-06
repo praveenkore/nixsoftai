@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269232"
+title: "AlmaLinux OS 9 must restrict privilege elevation to authorized personnel."
+stig_id: "ALMA-09-017290"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269232"
+
+rationale: |
+  If the "sudoers" file is not configured correctly, any user defined on the system can initiate privileged actions on the target system.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        grep -Ens 'ALL.*ALL=\(ALL\).*ALL|ALL.*ALL=\(ALL:ALL\).*ALL' /etc/sudoers /etc/sudoers.d/* | grep -v '#'
+        if [ $? -eq 0 ]; then
+          exit 1 # grep found unrestricted ALL
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify no unrestricted ALL=(ALL) ALL entries in sudoers"
+    remediation:
+      commands:
+        - "# Manual remediation required: Edit sudoers to remove 'ALL=(ALL) ALL' or 'ALL=(ALL:ALL) ALL'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual remediation required"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

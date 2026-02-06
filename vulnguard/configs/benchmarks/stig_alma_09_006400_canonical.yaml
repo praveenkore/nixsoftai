@@ -1,0 +1,31 @@
+benchmark: STIG
+id: "V-269138"
+title: "AlmaLinux OS 9 must require a unique superuser's name upon booting into single-user and maintenance modes."
+stig_id: "ALMA-09-006400"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000213
+srg: SRG-OS-000080-GPOS-00048
+
+rationale: |
+  Usage of a non-default grub superuser name makes password guessing attacks less effective.
+  The default is often 'root', suggesting a change to a unique name.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "set superusers", "/boot/grub2/grub.cfg"]
+      expected_state: "not_contains"
+      expected_value: "root"
+      description: "Verify superuser name is not 'root'"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Edit /etc/grub.d/01_users to change superuser name from root'"
+      requires_restart: false
+      requires_reboot: true
+      description: "Placeholder for manual grub superuser name change"
+    rollback:
+      commands: []
+      description: "Manual rollback required"

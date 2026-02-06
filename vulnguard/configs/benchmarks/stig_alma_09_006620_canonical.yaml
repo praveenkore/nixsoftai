@@ -1,0 +1,57 @@
+benchmark: STIG
+id: "V-269140"
+title: "The systemd Ctrl-Alt-Delete burst key sequence in AlmaLinux OS 9 must be disabled."
+stig_id: "ALMA-09-006620"
+original_severity: "CAT I"
+severity: high
+cci: CCI-002235
+srg: SRG-OS-000324-GPOS-00125
+
+rationale: |
+  Disabling the Ctrl-Alt-Delete burst action prevents accidental or malicious reboots
+  triggered by pressing the key sequence multiple times rapidly.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "^CtrlAltDelBurstAction=none", "/etc/systemd/system.conf"]
+      expected_state: "contains"
+      expected_value: "CtrlAltDelBurstAction=none"
+      description: "Verify CtrlAltDelBurstAction is set to none in system.conf"
+    remediation:
+      commands:
+        - "sed -i '/^CtrlAltDelBurstAction/d' /etc/systemd/system.conf"
+        - "echo 'CtrlAltDelBurstAction=none' >> /etc/systemd/system.conf"
+        - "systemctl daemon-reexec"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable Ctrl-Alt-Delete burst action"
+    rollback:
+      commands:
+        - "sed -i '/^CtrlAltDelBurstAction=none/d' /etc/systemd/system.conf"
+        - "systemctl daemon-reexec"
+      description: "Remove CtrlAltDelBurstAction configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "^CtrlAltDelBurstAction=none", "/etc/systemd/system.conf"]
+      expected_state: "contains"
+      expected_value: "CtrlAltDelBurstAction=none"
+      description: "Verify CtrlAltDelBurstAction is set to none in system.conf"
+    remediation:
+      commands:
+        - "sed -i '/^CtrlAltDelBurstAction/d' /etc/systemd/system.conf"
+        - "echo 'CtrlAltDelBurstAction=none' >> /etc/systemd/system.conf"
+        - "systemctl daemon-reexec"
+      requires_restart: false
+      requires_reboot: false
+      description: "Disable Ctrl-Alt-Delete burst action"
+    rollback:
+      commands:
+        - "sed -i '/^CtrlAltDelBurstAction=none/d' /etc/systemd/system.conf"
+        - "systemctl daemon-reexec"
+      description: "Remove CtrlAltDelBurstAction configuration"

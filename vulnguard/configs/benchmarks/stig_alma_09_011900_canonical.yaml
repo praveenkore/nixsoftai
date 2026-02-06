@@ -1,0 +1,48 @@
+benchmark: STIG
+id: "V-269184"
+title: "AlmaLinux OS 9 cron configuration files directory must be owned by root."
+stig_id: "ALMA-09-011900"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Cron configuration files must be owned by root to prevent unauthorized users from modifying them.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["stat", "-c", "%U", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/cron.monthly", "/etc/cron.weekly", "/etc/crontab"]
+      expected_state: "exact"
+      expected_value: "root\nroot\nroot\nroot\nroot\nroot"
+      description: "Verify cron directories/files are owned by root"
+    remediation:
+      commands:
+        - "chown root /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly /etc/crontab"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set ownership of cron configs to root"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["stat", "-c", "%U", "/etc/cron.d", "/etc/cron.daily", "/etc/cron.hourly", "/etc/cron.monthly", "/etc/cron.weekly", "/etc/crontab"]
+      expected_state: "exact"
+      expected_value: "root\nroot\nroot\nroot\nroot\nroot"
+      description: "Verify cron directories/files are owned by root"
+    remediation:
+      commands:
+        - "chown root /etc/cron.d /etc/cron.daily /etc/cron.hourly /etc/cron.monthly /etc/cron.weekly /etc/crontab"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set ownership of cron configs to root"
+    rollback:
+      commands: []
+      description: "Manual rollback"

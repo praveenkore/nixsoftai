@@ -1,0 +1,62 @@
+benchmark: STIG
+id: "V-269103"
+title: "AlmaLinux OS 9 must automatically lock graphical user sessions after 15 minutes of inactivity."
+stig_id: "ALMA-09-001120"
+original_severity: "CAT II"
+severity: high
+cci: CCI-000060
+srg: SRG-OS-000031-GPOS-00012
+
+rationale: |
+  A session lock is a temporary action taken when a user stops work and moves away from the immediate
+  physical vicinity of the information system but does not log out because of the temporary nature of the absence.
+  The session lock is implemented at the point where session activity can be determined.
+  The operating system session lock event must include an obfuscation of the display screen so as to prevent
+  other users from reading what was previously displayed.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-r", "idle-delay=uint32", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "idle-delay=uint32 900"
+      description: "Verify idle-delay is set to 900 seconds (15 minutes) in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/desktop/session]' > /etc/dconf/db/local.d/00-screensaver"
+        - "echo 'idle-delay=uint32 900' >> /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure system to lock session after 15 minutes of inactivity via dconf"
+    rollback:
+      commands:
+        - "rm -f /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      description: "Remove screensaver idle-delay configuration"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "-r", "idle-delay=uint32", "/etc/dconf/db/local.d/"]
+      expected_state: "contains"
+      expected_value: "idle-delay=uint32 900"
+      description: "Verify idle-delay is set to 900 seconds (15 minutes) in dconf settings"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/desktop/session]' > /etc/dconf/db/local.d/00-screensaver"
+        - "echo 'idle-delay=uint32 900' >> /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure system to lock session after 15 minutes of inactivity via dconf"
+    rollback:
+      commands:
+        - "rm -f /etc/dconf/db/local.d/00-screensaver"
+        - "dconf update"
+      description: "Remove screensaver idle-delay configuration"

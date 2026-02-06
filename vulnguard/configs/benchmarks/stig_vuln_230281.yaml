@@ -3,8 +3,14 @@ id: "V-230281"
 title: "The SSH daemon must not permit empty passwords."
 severity: critical
 original_severity: "CAT I"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Empty passwords allow authentication without any password, which is a significant security vulnerability."
 check:
   type: file

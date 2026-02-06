@@ -1,0 +1,51 @@
+benchmark: STIG
+id: "V-269179"
+title: "AlmaLinux OS 9 must disable acquiring, saving, and processing core dumps."
+stig_id: "ALMA-09-011350"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Disabling the systemd-coredump.socket prevents systemd from processing core dumps,
+  further ensuring no sensitive data is saved to disk.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["systemctl", "status", "systemd-coredump.socket"]
+      expected_state: "contains"
+      expected_value: "masked"
+      description: "Verify systemd-coredump.socket is masked"
+    remediation:
+      commands:
+        - "systemctl mask --now systemd-coredump.socket"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask systemd-coredump.socket"
+    rollback:
+      commands:
+        - "systemctl unmask --now systemd-coredump.socket"
+      description: "Unmask systemd-coredump.socket"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["systemctl", "status", "systemd-coredump.socket"]
+      expected_state: "contains"
+      expected_value: "masked"
+      description: "Verify systemd-coredump.socket is masked"
+    remediation:
+      commands:
+        - "systemctl mask --now systemd-coredump.socket"
+      requires_restart: false
+      requires_reboot: false
+      description: "Mask systemd-coredump.socket"
+    rollback:
+      commands:
+        - "systemctl unmask --now systemd-coredump.socket"
+      description: "Unmask systemd-coredump.socket"

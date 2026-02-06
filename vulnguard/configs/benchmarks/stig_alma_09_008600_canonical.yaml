@@ -1,0 +1,37 @@
+benchmark: STIG
+id: "V-269157"
+title: "AlmaLinux OS 9 must display the Standard Mandatory DOD Notice and Consent Banner before granting local or remote access to the system via a graphical user logon."
+stig_id: "ALMA-09-008600"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000048
+srg: SRG-OS-000023-GPOS-00006
+
+rationale: |
+  The DoD consent banner informs users of their rights and lack of privacy expectation on the system.
+  This must be displayed on the graphical login screen.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["gsettings", "get", "org.gnome.login-screen", "banner-message-enable"]
+      expected_state: "exact"
+      expected_value: "true"
+      description: "Verify banner message is enabled"
+    remediation:
+      commands:
+        - "mkdir -p /etc/dconf/db/local.d"
+        - "echo '[org/gnome/login-screen]' > /etc/dconf/db/local.d/01-banner-message"
+        - "echo 'banner-message-enable=true' >> /etc/dconf/db/local.d/01-banner-message"
+        - "echo \"banner-message-text='You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\\nBy using this IS (which includes any device attached to this IS), you consent to the following conditions:\\n-The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\\n-At any time, the USG may inspect and seize data stored on this IS.\\n-Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\\n-This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\\n-Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.'\" >> /etc/dconf/db/local.d/01-banner-message"
+        - "dconf update"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set DoD banner text for GNOME"
+    rollback:
+      commands:
+        - "rm -f /etc/dconf/db/local.d/01-banner-message"
+        - "dconf update"
+      description: "Remove GNOME banner configuration"

@@ -1,0 +1,38 @@
+benchmark: STIG
+id: "V-269116"
+title: "AlmaLinux OS 9 must implement DOD-approved encryption ciphers to protect the confidentiality of SSH server connections."
+stig_id: "ALMA-09-003320"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  Without cryptographic integrity protections, information can be altered by unauthorized users
+  without detection. The SSH server must be configured to use only ciphers employing FIPS 140-3
+  approved algorithms to protect the confidentiality of SSH connections.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["cat", "/proc/sys/crypto/fips_enabled"]
+      expected_state: "equals"
+      expected_value: "1"
+      expected_type: "integer"
+      description: "Verify FIPS mode is enabled in kernel"
+    remediation:
+      commands:
+        - "rpm -q dracut-fips || dnf install -y dracut-fips"
+        - "update-crypto-policies --set FIPS"
+        - "dracut -f"
+      requires_restart: false
+      requires_reboot: true
+      description: "Enable FIPS mode and update crypto policies"
+    rollback:
+      commands:
+        - "update-crypto-policies --set DEFAULT"
+        - "dracut -f"
+      description: "Revert to DEFAULT crypto policy"
+      requires_reboot: true

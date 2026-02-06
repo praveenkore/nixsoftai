@@ -1,0 +1,55 @@
+benchmark: STIG
+id: "V-269134"
+title: "AlmaLinux OS 9 must generate audit records for all account creations, modifications, disabling, and termination events that affect /etc/shadow."
+stig_id: "ALMA-09-005960"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000018
+srg: SRG-OS-000004-GPOS-00004
+
+rationale: |
+  Audit records are essential for investigating security incidents.
+  Changes to /etc/shadow must be audited to track password modifications.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-E", "-w /etc/shadow -p wa -k identity", "/etc/audit/audit.rules"]
+      expected_state: "contains"
+      expected_value: "-w /etc/shadow -p wa -k identity"
+      description: "Verify audit rule for /etc/shadow exists"
+    remediation:
+      commands:
+        - "echo '-w /etc/shadow -p wa -k identity' >> /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      requires_restart: false
+      requires_reboot: false
+      description: "Add audit rule for /etc/shadow"
+    rollback:
+      commands:
+        - "sed -i '|-w /etc/shadow -p wa -k identity|d' /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      description: "Remove audit rule for /etc/shadow"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["auditctl", "-l"]
+      expected_state: "contains"
+      expected_value: "-w /etc/shadow -p wa -k identity"
+      description: "Verify audit rule for /etc/shadow is loaded"
+    remediation:
+      commands:
+        - "echo '-w /etc/shadow -p wa -k identity' >> /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      requires_restart: false
+      requires_reboot: false
+      description: "Add audit rule for /etc/shadow"
+    rollback:
+      commands:
+        - "sed -i '|-w /etc/shadow -p wa -k identity|d' /etc/audit/rules.d/audit.rules"
+        - "augenrules --load"
+      description: "Remove audit rule for /etc/shadow"

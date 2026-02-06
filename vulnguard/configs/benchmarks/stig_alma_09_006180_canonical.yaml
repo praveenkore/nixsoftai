@@ -1,0 +1,37 @@
+benchmark: STIG
+id: "V-269136"
+title: "AlmaLinux OS 9 must require authentication to access emergency mode."
+stig_id: "ALMA-09-006180"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000213
+srg: SRG-OS-000080-GPOS-00048
+
+rationale: |
+  Prevent attackers with physical access from easily bypassing security on the machine and gaining root access.
+  Authentication must be required for emergency mode.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency", "/usr/lib/systemd/system/emergency.service"]
+      expected_state: "contains"
+      expected_value: "ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency"
+      description: "Verify emergency mode requires authentication"
+    remediation:
+      commands:
+        - "mkdir -p /etc/systemd/system/emergency.service.d"
+        - "echo '[Service]' > /etc/systemd/system/emergency.service.d/override.conf"
+        - "echo 'ExecStart=' >> /etc/systemd/system/emergency.service.d/override.conf"
+        - "echo 'ExecStart=-/usr/lib/systemd/systemd-sulogin-shell emergency' >> /etc/systemd/system/emergency.service.d/override.conf"
+        - "systemctl daemon-reload"
+      requires_restart: false
+      requires_reboot: false
+      description: "Configure systemd to require authentication for emergency mode"
+    rollback:
+      commands:
+        - "rm -f /etc/systemd/system/emergency.service.d/override.conf"
+        - "systemctl daemon-reload"
+      description: "Remove systemd override for emergency mode"

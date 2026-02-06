@@ -1,0 +1,50 @@
+benchmark: STIG
+id: "V-269127"
+title: "AlmaLinux OS 9 must enable FIPS mode."
+stig_id: "ALMA-09-004420"
+original_severity: "CAT I"
+severity: high
+cci: CCI-000068
+srg: SRG-OS-000033-GPOS-00014
+
+rationale: |
+  The operating system must enable FIPS mode to force the use of validated cryptographic algorithms.
+  This is a system-wide kernel flag.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["cat", "/proc/sys/crypto/fips_enabled"]
+      expected_state: "exact"
+      expected_value: "1"
+      description: "Verify fips_enabled is 1"
+    remediation:
+      commands:
+        - "fips-mode-setup --enable"
+      requires_restart: false
+      requires_reboot: true
+      description: "Enable FIPS mode using fips-mode-setup"
+    rollback:
+      commands:
+        - "fips-mode-setup --disable"
+      description: "Disable FIPS mode"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["cat", "/proc/sys/crypto/fips_enabled"]
+      expected_state: "exact"
+      expected_value: "1"
+      description: "Verify fips_enabled is 1"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Enable FIPS mode via kernel boot arguments or UA client'"
+      requires_restart: false
+      requires_reboot: true
+      description: "Placeholder for Debian FIPS enablement"
+    rollback:
+      commands: []
+      description: "Manual rollback required"

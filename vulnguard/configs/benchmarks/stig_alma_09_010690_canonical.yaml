@@ -1,0 +1,48 @@
+benchmark: STIG
+id: "V-269173"
+title: "AlmaLinux OS 9 library directories must be owned by root."
+stig_id: "ALMA-09-010690"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001499
+srg: SRG-OS-000259-GPOS-00100
+
+rationale: |
+  System libraries must be owned by root to protect against unauthorized changes.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "-L", "/lib", "/lib64", "/usr/lib", "/usr/lib64", "!", "-user", "root", "-type", "d", "-exec", "ls", "-ld", "{}", ";"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify library directories are owned by root"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find command to identify and chown non-compliant directories'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for library directory owner"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["find", "-L", "/lib", "/lib64", "/usr/lib", "/usr/lib64", "!", "-user", "root", "-type", "d", "-exec", "ls", "-ld", "{}", ";"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify library directories are owned by root"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find command to identify and chown non-compliant directories'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for library directory owner"
+    rollback:
+      commands: []
+      description: "Manual rollback"

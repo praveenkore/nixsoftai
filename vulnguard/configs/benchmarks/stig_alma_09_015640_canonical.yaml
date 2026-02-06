@@ -1,0 +1,33 @@
+benchmark: STIG
+id: "V-269217"
+title: "AlmaLinux OS 9 must enforce a delay of at least four seconds between logon prompts following a failed logon attempt."
+stig_id: "ALMA-09-015640"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269217"
+
+rationale: |
+  Increasing the time between a failed authentication attempt and prompting to re-enter credentials helps to slow a single-threaded brute force attack.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "FAIL_DELAY", "/etc/login.defs"]
+      expected_state: "regex"
+      expected_value: "^FAIL_DELAY\\s+[4-9]|[1-9][0-9]+$"
+      description: "Verify FAIL_DELAY is 4 or greater in /etc/login.defs"
+    remediation:
+      commands:
+        - "sed -i 's/^FAIL_DELAY.*/FAIL_DELAY 4/' /etc/login.defs"
+        - "grep -q '^FAIL_DELAY' /etc/login.defs || echo 'FAIL_DELAY 4' >> /etc/login.defs"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set FAIL_DELAY to 4 in /etc/login.defs"
+    rollback:
+      commands:
+        - "sed -i '/^FAIL_DELAY/d' /etc/login.defs"
+      description: "Remove FAIL_DELAY setting"

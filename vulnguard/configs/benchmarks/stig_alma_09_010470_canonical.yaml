@@ -1,0 +1,49 @@
+benchmark: STIG
+id: "V-269171"
+title: "AlmaLinux OS 9 system commands must have mode 755 or less permissive."
+stig_id: "ALMA-09-010470"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-001499
+srg: SRG-OS-000259-GPOS-00100
+
+rationale: |
+  System commands should not be writable by group or others to prevent tampering.
+  Mode 755 (rwxr-xr-x) allows execution but prevents modification.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "-L", "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/libexec", "/usr/local/bin", "/usr/local/sbin", "-perm", "/022", "-exec", "ls", "-l", "{}", ";"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify system commands are not group/world writable"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find command to identify and chmod non-compliant files'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for system file permissions"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["find", "-L", "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/libexec", "/usr/local/bin", "/usr/local/sbin", "-perm", "/022", "-exec", "ls", "-l", "{}", ";"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify system commands are not group/world writable"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find command to identify and chmod non-compliant files'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for system file permissions"
+    rollback:
+      commands: []
+      description: "Manual rollback"

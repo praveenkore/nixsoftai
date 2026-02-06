@@ -1,0 +1,36 @@
+benchmark: STIG
+id: "V-269286"
+title: "AlmaLinux OS 9 must prevent code execution on file systems that are imported via Network File System (NFS)."
+stig_id: "ALMA-09-023230"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+vulnerability_id: "V-269286"
+
+rationale: |
+  The \"noexec\" mount option causes the system to not execute binary files. Executing files from untrusted file systems increases the opportunity for nonprivileged users to attain unauthorized administrative access.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["bash", "-c"]
+      script: |
+        # Check fstab for NFS mounts without noexec
+        grep -i "nfs" /etc/fstab | grep -iv "noexec" && exit 1
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify NFS mounts in /etc/fstab have noexec option"
+    remediation:
+      commands:
+        - "# Manual remediation: Add 'noexec' to NFS entries in /etc/fstab"
+      requires_restart: false
+      requires_reboot: false
+      description: "Add noexec option to NFS mounts in fstab manually"
+    rollback:
+      commands:
+        - "# Manual rollback required"
+      description: "Manual rollback required"

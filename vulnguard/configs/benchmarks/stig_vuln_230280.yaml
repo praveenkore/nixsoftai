@@ -3,8 +3,14 @@ id: "V-230280"
 title: "The SSH daemon must not permit host-based authentication."
 severity: medium
 original_severity: "CAT III"
+# Universal - SSH configuration is consistent across all Linux distributions
 os_compatibility:
+  - rhel
+  - centos
+  - almalinux
+  - rocky
   - ubuntu
+  - debian
 rationale: "Host-based authentication relies on potentially insecure trust relationships and should be disabled."
 check:
   type: file

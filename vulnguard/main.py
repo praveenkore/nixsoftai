@@ -32,6 +32,10 @@ from typing import Any, Dict, List, Optional
 import click
 import jsonschema
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 from vulnguard.pkg.scanner.scanner import Scanner, ScanResult
 from vulnguard.pkg.engine.engine import ComplianceEngine, EvaluationResult
 from vulnguard.pkg.advisor.advisor import AIAdvisor, AIAdvisory
@@ -308,6 +312,26 @@ class VulnGuardOrchestrator:
             command_blocklist=self.config.get('remediation', {}).get('command_blocklist', [])
         )
     
+    def shutdown(self) -> None:
+        """Shutdown the orchestrator and cleanup all resources."""
+        self.logger.log_info("Shutting down VulnGuard orchestrator...")
+        
+        # Shutdown AI advisor (closes thread pool and HTTP clients)
+        if self.advisor:
+            self.advisor.shutdown(wait=True)
+        
+        # Close gateway client
+        if self.gateway_client:
+            self.gateway_client.close()
+        
+        self.logger.log_info("VulnGuard orchestrator shutdown complete")
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.shutdown()
+    
     def _load_config(self) -> Dict[str, Any]:
         """
         Load agent configuration from YAML file with schema validation.
@@ -419,12 +443,18 @@ class VulnGuardOrchestrator:
         
         # Step 3: Get AI advisories for rules that need them
         click.echo("Step 3: Getting AI advisories...")
-        ai_advisories = []
         
         # Helper lookup
         evaluation_lookup = {r.rule_id: r for r in evaluation_results}
-
+        
+        # Collect all items that need AI assistance for batch processing
+        # Only include applicable rules (skip not_applicable rules)
+        ai_assist_items = []
         for scan_result in scan_results:
+            # Skip not_applicable rules - they didn't run and don't need AI assistance
+            if getattr(scan_result, 'applicability', 'applicable') == 'not_applicable':
+                continue
+                
             eval_result = evaluation_lookup.get(scan_result.rule_id)
             if not eval_result:
                 continue
@@ -435,14 +465,18 @@ class VulnGuardOrchestrator:
                 if not rule_data:
                     rule_data = self.scanner._load_rule(f"{scan_result.rule_id}.yml")
                 
-                advisory, error = self.advisor.get_advisory(
-                    rule_id=scan_result.rule_id,
-                    scan_result=scan_result,
-                    evaluation_result=eval_result,
-                    rule_data=rule_data
-                )
-                if advisory:
-                    ai_advisories.append(advisory)
+                ai_assist_items.append((
+                    scan_result.rule_id,
+                    scan_result,
+                    eval_result,
+                    rule_data
+                ))
+        
+        # Process all AI advisories concurrently using batch method
+        if ai_assist_items:
+            ai_advisories = self.advisor.get_advisories_batch(ai_assist_items)
+        else:
+            ai_advisories = []
         
         click.echo(f"  Generated {len(ai_advisories)} AI advisories")
         
@@ -605,44 +639,43 @@ def scan(rule_id: tuple, output: Optional[str], format: str, send: bool):
     Scans the system against CIS and STIG benchmarks and generates
     a compliance report.
     """
-    orchestrator = VulnGuardOrchestrator()
-    
-    # Run scan pipeline
-    scan_results, evaluation_results, ai_advisories = orchestrator.run_scan(
-        rule_ids=list(rule_id) if rule_id else None
-    )
-    
-    # Generate report
-    report = orchestrator.generate_report(
-        scan_results=scan_results,
-        evaluation_results=evaluation_results,
-        output_format=format
-    )
-    
-    # Send to gateway if requested
-    if send:
-        if orchestrator.gateway_enabled and orchestrator.gateway_client:
-            # Generate JSON data for gateway
-            json_report = json.loads(orchestrator.generate_report(
-                scan_results=scan_results,
-                evaluation_results=evaluation_results,
-                output_format='json'
-            ))
-            try:
-                orchestrator.gateway_client.send_report(json_report)
-                click.echo("Report successfully sent to C2 server.")
-            except Exception as e:
-                click.echo(f"Error sending report to C2 server: {str(e)}", err=True)
+    with VulnGuardOrchestrator() as orchestrator:
+        # Run scan pipeline
+        scan_results, evaluation_results, ai_advisories = orchestrator.run_scan(
+            rule_ids=list(rule_id) if rule_id else None
+        )
+        
+        # Generate report
+        report = orchestrator.generate_report(
+            scan_results=scan_results,
+            evaluation_results=evaluation_results,
+            output_format=format
+        )
+        
+        # Send to gateway if requested
+        if send:
+            if orchestrator.gateway_enabled and orchestrator.gateway_client:
+                # Generate JSON data for gateway
+                json_report = json.loads(orchestrator.generate_report(
+                    scan_results=scan_results,
+                    evaluation_results=evaluation_results,
+                    output_format='json'
+                ))
+                try:
+                    orchestrator.gateway_client.send_report(json_report)
+                    click.echo("Report successfully sent to C2 server.")
+                except Exception as e:
+                    click.echo(f"Error sending report to C2 server: {str(e)}", err=True)
+            else:
+                click.echo("Gateway is not enabled in configuration. Cannot send report.", err=True)
+        
+        # Output report
+        if output:
+            with open(output, 'w') as f:
+                f.write(report)
+            click.echo(f"Report saved to: {output}")
         else:
-            click.echo("Gateway is not enabled in configuration. Cannot send report.", err=True)
-
-    # Output report
-    if output:
-        with open(output, 'w') as f:
-            f.write(report)
-        click.echo(f"Report saved to: {output}")
-    else:
-        click.echo(report)
+            click.echo(report)
 
 
 @cli.command()
@@ -690,55 +723,54 @@ def remediate(rule_id: tuple, mode: str, force: bool, output: Optional[str], for
     Scans, evaluates, and applies remediation for non-compliant rules.
     Default mode is dry-run for safety.
     """
-    orchestrator = VulnGuardOrchestrator()
-    
-    # Run scan pipeline
-    scan_results, evaluation_results, ai_advisories = orchestrator.run_scan(
-        rule_ids=list(rule_id) if rule_id else None
-    )
-    
-    # Run remediation
-    remediation_results = orchestrator.run_remediation(
-        scan_results=scan_results,
-        evaluation_results=evaluation_results,
-        ai_advisories=ai_advisories,
-        mode=mode,
-        force=force
-    )
-    
-    # Generate report
-    report = orchestrator.generate_report(
-        scan_results=scan_results,
-        evaluation_results=evaluation_results,
-        remediation_results=remediation_results,
-        output_format=format
-    )
-    
-    # Send to gateway if requested
-    if send:
-        if orchestrator.gateway_enabled and orchestrator.gateway_client:
-            # Generate JSON data for gateway
-            json_report = json.loads(orchestrator.generate_report(
-                scan_results=scan_results,
-                evaluation_results=evaluation_results,
-                remediation_results=remediation_results,
-                output_format='json'
-            ))
-            try:
-                orchestrator.gateway_client.send_report(json_report)
-                click.echo("Remediation report successfully sent to C2 server.")
-            except Exception as e:
-                click.echo(f"Error sending report to C2 server: {str(e)}", err=True)
+    with VulnGuardOrchestrator() as orchestrator:
+        # Run scan pipeline
+        scan_results, evaluation_results, ai_advisories = orchestrator.run_scan(
+            rule_ids=list(rule_id) if rule_id else None
+        )
+        
+        # Run remediation
+        remediation_results = orchestrator.run_remediation(
+            scan_results=scan_results,
+            evaluation_results=evaluation_results,
+            ai_advisories=ai_advisories,
+            mode=mode,
+            force=force
+        )
+        
+        # Generate report
+        report = orchestrator.generate_report(
+            scan_results=scan_results,
+            evaluation_results=evaluation_results,
+            remediation_results=remediation_results,
+            output_format=format
+        )
+        
+        # Send to gateway if requested
+        if send:
+            if orchestrator.gateway_enabled and orchestrator.gateway_client:
+                # Generate JSON data for gateway
+                json_report = json.loads(orchestrator.generate_report(
+                    scan_results=scan_results,
+                    evaluation_results=evaluation_results,
+                    remediation_results=remediation_results,
+                    output_format='json'
+                ))
+                try:
+                    orchestrator.gateway_client.send_report(json_report)
+                    click.echo("Remediation report successfully sent to C2 server.")
+                except Exception as e:
+                    click.echo(f"Error sending report to C2 server: {str(e)}", err=True)
+            else:
+                click.echo("Gateway is not enabled in configuration. Cannot send report.", err=True)
+        
+        # Output report
+        if output:
+            with open(output, 'w') as f:
+                f.write(report)
+            click.echo(f"Report saved to: {output}")
         else:
-            click.echo("Gateway is not enabled in configuration. Cannot send report.", err=True)
-
-    # Output report
-    if output:
-        with open(output, 'w') as f:
-            f.write(report)
-        click.echo(f"Report saved to: {output}")
-    else:
-        click.echo(report)
+            click.echo(report)
 
 
 @cli.command()

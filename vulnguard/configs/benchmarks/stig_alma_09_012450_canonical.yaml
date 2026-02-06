@@ -1,0 +1,49 @@
+benchmark: STIG
+id: "V-269189"
+title: "All AlmaLinux OS 9 local files and directories must have a valid group owner."
+stig_id: "ALMA-09-012450"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00227
+
+rationale: |
+  Files without a valid group owner (GID not in /etc/group) may be subject to unauthorized access
+  if a new group is created with that GID.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["find", "/", "-xdev", "-nogroup", "-print"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify no files exist without a valid group"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find / -xdev -nogroup to identify and chgrp files'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for valid group ownership"
+    rollback:
+      commands: []
+      description: "Manual rollback"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["find", "/", "-xdev", "-nogroup", "-print"]
+      expected_state: "empty"
+      expected_value: ""
+      description: "Verify no files exist without a valid group"
+    remediation:
+      commands:
+        - "echo 'Manual intervention required: Run find / -xdev -nogroup to identify and chgrp files'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Manual fix required for valid group ownership"
+    rollback:
+      commands: []
+      description: "Manual rollback"

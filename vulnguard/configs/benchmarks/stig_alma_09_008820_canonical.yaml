@@ -1,0 +1,58 @@
+benchmark: STIG
+id: "V-269159"
+title: "AlmaLinux OS 9 must display the Standard Mandatory DOD Notice and Consent Banner before granting local or remote access to the system via an SSH user logon."
+stig_id: "ALMA-09-008820"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000048
+srg: SRG-OS-000023-GPOS-00006
+
+rationale: |
+  The DoD consent banner must be displayed on SSH logins via /etc/issue.net and configured in sshd_config.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "Banner /etc/issue.net", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "Banner /etc/issue.net"
+      description: "Verify Banner is set to /etc/issue.net in sshd_config"
+    remediation:
+      commands:
+        - "echo 'You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\nBy using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n-The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n\n-At any time, the USG may inspect and seize data stored on this IS.\n\n-Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n-This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n-Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.' > /etc/issue.net"
+        - "echo 'Banner /etc/issue.net' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Set /etc/issue.net and configure sshd Banner"
+    rollback:
+      commands:
+        - "sed -i '/Banner \/etc\/issue.net/d' /etc/ssh/sshd_config"
+        - "echo '\\S' > /etc/issue.net"
+        - "systemctl reload sshd"
+      description: "Remove Banner config from sshd"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "Banner /etc/issue.net", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "Banner /etc/issue.net"
+      description: "Verify Banner is set to /etc/issue.net in sshd_config"
+    remediation:
+      commands:
+        - "echo 'You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\nBy using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n-The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n\n-At any time, the USG may inspect and seize data stored on this IS.\n\n-Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n-This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n-Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.' > /etc/issue.net"
+        - "echo 'Banner /etc/issue.net' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Set /etc/issue.net and configure sshd Banner"
+    rollback:
+      commands:
+        - "sed -i '/Banner \/etc\/issue.net/d' /etc/ssh/sshd_config"
+        - "echo '\\n \\l' > /etc/issue.net"
+        - "systemctl reload sshd"
+      description: "Remove Banner config from sshd"

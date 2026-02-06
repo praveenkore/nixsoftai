@@ -1,0 +1,39 @@
+benchmark: STIG
+id: "V-269237"
+title: "AlmaLinux OS 9 must define default permissions for logon and nonlogon shells."
+stig_id: "ALMA-09-017840"
+original_severity: "CAT II"
+severity: medium
+cci: CCI-000366
+srg: SRG-OS-000480-GPOS-00228
+vulnerability_id: "V-269237"
+
+rationale: |
+  Setting the most restrictive default permissions ensures that when new accounts are created they do not have unnecessary access.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: []
+      script: |
+        grep -ir "umask" /etc/profile* /etc/bashrc* /etc/csh* | grep -vE ':umask 077|:umask 0077'
+        if [ $? -eq 0 ]; then
+             exit 1 # Found umask other than 077
+        fi
+        exit 0
+      expected_state: "exit_code"
+      expected_value: "0"
+      description: "Verify system shell configuration files set umask to 077"
+    remediation:
+      commands:
+        - "sed -i 's/umask [0-9]*/umask 077/g' /etc/profile /etc/bashrc /etc/csh.cshrc"
+        - "grep -r 'umask' /etc/profile.d/ | cut -d: -f1 | xargs sed -i 's/umask [0-9]*/umask 077/g'"
+      requires_restart: false
+      requires_reboot: false
+      description: "Set umask to 077 in system shell configurations"
+    rollback:
+      commands:
+        - "sed -i 's/umask 077/umask 022/g' /etc/profile /etc/bashrc /etc/csh.cshrc"
+      description: "Revert umask to 022"

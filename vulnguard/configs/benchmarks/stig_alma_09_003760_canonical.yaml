@@ -1,0 +1,32 @@
+benchmark: STIG
+id: "V-269121"
+title: "AlmaLinux OS 9 must implement DOD-approved TLS encryption in the GnuTLS package."
+stig_id: "ALMA-09-003760"
+original_severity: "CAT I"
+severity: high
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  GnuTLS must use the system-wide FIPS crypto policy to ensure DOD-approved TLS encryption is used.
+  This ensures cryptographic integrity and confidentiality.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["update-crypto-policies", "--show"]
+      expected_state: "exact"
+      expected_value: "FIPS"
+      description: "Verify system crypto policy is set to FIPS"
+    remediation:
+      commands:
+        - "fips-mode-setup --enable"
+      requires_restart: false
+      requires_reboot: true
+      description: "Enable FIPS mode via fips-mode-setup"
+    rollback:
+      commands:
+        - "fips-mode-setup --disable"
+      description: "Disable FIPS mode"

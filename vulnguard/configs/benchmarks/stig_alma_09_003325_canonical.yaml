@@ -1,0 +1,54 @@
+benchmark: STIG
+id: "V-269117"
+title: "AlmaLinux OS 9 SSH server must be configured to use only FIPS 140-3 validated key exchange algorithms."
+stig_id: "ALMA-09-003325"
+original_severity: "CAT II"
+severity: high
+cci: CCI-001453
+srg: SRG-OS-000250-GPOS-00093
+
+rationale: |
+  Without cryptographic integrity protections provided by FIPS-validated cryptographic algorithms,
+  information can be viewed and altered by unauthorized users without detection.
+  SSH server must restrict Key Exchange Algorithms to strong, validated options.
+
+implementations:
+  rhel_family:
+    os: ["rhel", "centos", "almalinux", "rocky"]
+    check:
+      type: command
+      command: ["grep", "-i", "kexalgorithms", "/etc/crypto-policies/back-ends/opensshserver.config"]
+      expected_state: "contains"
+      expected_value: "ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256"
+      description: "Verify SSH server uses FIPS approved KEX in crypto-policies"
+    remediation:
+      commands:
+        - "sed -i -E '/^KexAlgorithms/s/.*/KexAlgorithms ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256/' /etc/crypto-policies/back-ends/opensshserver.config"
+      requires_restart: true
+      requires_reboot: true
+      description: "Configure SSH server KEX in crypto-policies"
+    rollback:
+      commands:
+        - "update-crypto-policies --set DEFAULT"
+      description: "Reset crypto-policies to DEFAULT"
+
+  debian_family:
+    os: ["debian", "ubuntu"]
+    check:
+      type: command
+      command: ["grep", "^KexAlgorithms", "/etc/ssh/sshd_config"]
+      expected_state: "contains"
+      expected_value: "ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256"
+      description: "Verify SSH server uses FIPS approved KEX in sshd_config"
+    remediation:
+      commands:
+        - "echo 'KexAlgorithms ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256' >> /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      requires_restart: true
+      requires_reboot: false
+      description: "Configure SSH server KEX in sshd_config"
+    rollback:
+      commands:
+        - "sed -i '/^KexAlgorithms ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256/d' /etc/ssh/sshd_config"
+        - "systemctl reload sshd"
+      description: "Remove enforced KexAlgorithms from sshd_config"
