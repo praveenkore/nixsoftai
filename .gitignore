@@ -85,3 +85,6 @@ temp/
 # Code Analysis Reports & Task Lists
 code_analysis_report.md
 TASK_LIST.md
+
+# Agent Generated Data
+.kilocode/
